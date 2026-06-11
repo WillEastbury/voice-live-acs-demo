@@ -135,9 +135,9 @@ DEFAULT_DEMO_STATE: dict[str, Any] = {
         "context": "Demo clinic context:\n- Patient is using fake demo data only.\n- Available departments: GP, cardiology, dermatology, pharmacy.\n- Do not give real medical advice.\n- For urgent or worsening symptoms, advise local urgent care/emergency services.\n\nIf asked to use tools, call the fake healthcare APIs and explain that results are synthetic demo data.",
     },
     "patients": [
-        {"id": "demo-patient", "name": "Alex Demo", "date_of_birth": "1984-04-12", "phone_last4": "1001", "nhs_number": "DEMO-0001", "notes": "Default demo patient."},
-        {"id": "pat-amelia", "name": "Amelia Green", "date_of_birth": "1978-09-03", "phone_last4": "2002", "nhs_number": "DEMO-0002", "notes": "Prefers morning calls."},
-        {"id": "pat-oliver", "name": "Oliver Brown", "date_of_birth": "1991-01-22", "phone_last4": "3003", "nhs_number": "DEMO-0003", "notes": "Uses Riverside Pharmacy."},
+        {"id": "demo-patient", "name": "Alex Demo", "date_of_birth": "1984-04-12", "postcode": "SW1A 1AA", "nhs_number": "DEMO-0001", "notes": "Default demo patient."},
+        {"id": "pat-amelia", "name": "Amelia Green", "date_of_birth": "1978-09-03", "postcode": "BS1 4ST", "nhs_number": "DEMO-0002", "notes": "Prefers morning calls."},
+        {"id": "pat-oliver", "name": "Oliver Brown", "date_of_birth": "1991-01-22", "postcode": "M1 1AE", "nhs_number": "DEMO-0003", "notes": "Uses Riverside Pharmacy."},
     ],
     "calendar_slots": [
         {"id": "slot-urgent-1", "specialty": "GP", "doctor": "Dr Patel", "time": "Today 16:20", "mode": "phone", "urgency": "urgent", "status": "available"},
@@ -195,15 +195,19 @@ def get_patient(patient_reference: str) -> dict[str, Any] | None:
     return None
 
 
-def verify_patient_identity(name: str, date_of_birth: str, phone_last4: str) -> dict[str, Any] | None:
+def _normalize_postcode(postcode: str) -> str:
+    return "".join(ch for ch in postcode.upper() if ch.isalnum())
+
+
+def verify_patient_identity(name: str, date_of_birth: str, postcode: str) -> dict[str, Any] | None:
     normalized_name = " ".join(name.strip().lower().split())
     normalized_dob = date_of_birth.strip()
-    normalized_last4 = "".join(ch for ch in phone_last4 if ch.isdigit())[-4:]
+    normalized_postcode = _normalize_postcode(postcode)
     for patient in DEMO_STATE["patients"]:
         if (
             " ".join(patient.get("name", "").lower().split()) == normalized_name
             and patient.get("date_of_birth") == normalized_dob
-            and patient.get("phone_last4") == normalized_last4
+            and _normalize_postcode(patient.get("postcode", "")) == normalized_postcode
         ):
             return deepcopy(patient)
     return None
@@ -215,7 +219,7 @@ def add_patient(patient: dict[str, Any]) -> dict[str, Any]:
         "id": patient_id,
         "name": str(patient.get("name") or patient_id),
         "date_of_birth": str(patient.get("date_of_birth") or "not specified"),
-        "phone_last4": "".join(ch for ch in str(patient.get("phone_last4") or "0000") if ch.isdigit())[-4:],
+        "postcode": str(patient.get("postcode") or "ZZ1 1ZZ").upper(),
         "nhs_number": str(patient.get("nhs_number") or "DEMO-" + uuid.uuid4().hex[:4].upper()),
         "notes": str(patient.get("notes") or ""),
     }

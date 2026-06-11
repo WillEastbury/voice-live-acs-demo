@@ -106,11 +106,11 @@
       </div>
       <div class="row">
         <input id="patientDob" placeholder="Date of birth" value="1988-06-20">
-        <input id="patientPhoneLast4" placeholder="Registered phone last 4" value="4004">
+        <input id="patientPostcode" placeholder="Postcode" value="N1 1AA">
       </div>
       <div class="row">
         <input id="patientNhs" placeholder="Demo NHS/reference number" value="DEMO-0004">
-        <input id="patientVerifyHint" placeholder="Voice login hint" value="Name + DOB + phone last 4">
+        <input id="patientVerifyHint" placeholder="Voice login hint" value="Name + DOB + postcode">
       </div>
       <textarea id="patientNotes">Demo patient created from the fake systems GUI.</textarea>
       <button id="addPatient">Add patient</button>
@@ -245,7 +245,7 @@ async function refresh() {
     .filter(slot => slot.status === 'available')
     .map(slot => `<option value="${cell(slot.id)}">${cell(slot.specialty)} · ${cell(slot.doctor)} · ${cell(slot.time)} (${cell(slot.id)})</option>`)
     .join('');
-  table('patientsTable', ['id', 'name', 'date_of_birth', 'phone_last4', 'nhs_number', 'notes'], state.patients);
+  table('patientsTable', ['id', 'name', 'date_of_birth', 'postcode', 'nhs_number', 'notes'], state.patients);
   table('slotsTable', ['id', 'specialty', 'doctor', 'time', 'mode', 'urgency', 'status'], state.calendar_slots);
   table('appointmentsTable', ['appointment_id', 'patient_reference', 'specialty', 'doctor', 'time', 'mode', 'reason', 'status', 'created_at'], state.appointments);
   table('resultsTable', ['id', 'patient_reference', 'result_type', 'name', 'value', 'status'], state.medical_results);
@@ -273,7 +273,7 @@ async function loadPatientView() {
   const view = await api(`/api/fake/patients/${encodeURIComponent(patientId)}`);
   document.getElementById('patientView').innerHTML = `
     <h4>${cell(view.patient.name)} <span class="muted">(${cell(view.patient.id)})</span></h4>
-    <p><strong>DOB:</strong> ${cell(view.patient.date_of_birth)} · <strong>Phone last 4:</strong> ${cell(view.patient.phone_last4)} · <strong>Reference:</strong> ${cell(view.patient.nhs_number)}</p>
+    <p><strong>DOB:</strong> ${cell(view.patient.date_of_birth)} · <strong>Postcode:</strong> ${cell(view.patient.postcode)} · <strong>Reference:</strong> ${cell(view.patient.nhs_number)}</p>
     <p>${cell(view.patient.notes)}</p>
     <h4>Medical results</h4>
     ${inlineTable(['id', 'result_type', 'name', 'value', 'status'], view.medical_results)}
@@ -295,7 +295,7 @@ async function addPatient() {
       id: document.getElementById('patientId').value,
       name: document.getElementById('patientName').value,
       date_of_birth: document.getElementById('patientDob').value,
-      phone_last4: document.getElementById('patientPhoneLast4').value,
+      postcode: document.getElementById('patientPostcode').value,
       nhs_number: document.getElementById('patientNhs').value,
       notes: document.getElementById('patientNotes').value,
     }),

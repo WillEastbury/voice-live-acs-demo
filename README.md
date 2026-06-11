@@ -97,7 +97,7 @@ The app is deployed to the existing AKS cluster and existing nginx ingress/LB:
 
 The image was built by a one-shot Kubernetes build job on the existing ARM64 AKS nodes and pushed to the existing `tileforgeacr` registry. No new load balancer or persistent compute was created.
 
-The browser voice chat includes a custom greeting box, patient identity fields, and live context editor. Demo users identify with name, date of birth, and the last four digits of their registered fake phone number. Each browser voice session randomly chooses an en-GB Azure voice and personalizes the greeting with the linked synthetic patient's name. The greeting is spoken when the session starts and can be replayed during the call. Greeting and context can be saved into the in-memory demo configuration. Apply context before or during a voice session to update the Voice Live instructions, or inject the same context as a simulated tool result for demos.
+The browser voice chat includes a custom greeting box, patient identity fields, and live context editor. Demo users identify with name, postcode, and date of birth against a fake auth record before their synthetic medical record is linked. Each browser voice session randomly chooses an en-GB Azure voice and personalizes the greeting with the linked synthetic patient's name. The greeting is spoken when the session starts and can be replayed during the call. Greeting and context can be saved into the in-memory demo configuration. Apply context before or during a voice session to update the Voice Live instructions, or inject the same context as a simulated tool result for demos.
 
 The main `/voice` page is a merged tabbed console with **Voice chat** and **Fake systems** tabs. The standalone tabbed fake systems GUI remains available at `/systems` and lets a presenter shape the demo live:
 
@@ -224,7 +224,7 @@ kubectl -n voice-live-demo create secret generic voice-live-acs-demo-env \
 | `/api/fake` | Index of fake medical APIs. |
 | `/api/fake/state` | Current in-memory fake system state. |
 | `/api/fake/reset` | Reset fake system state to defaults. |
-| `/api/fake/verify-patient` | Verify fake user identity by name, DOB, and phone last-4. |
+| `/api/fake/verify-patient` | Verify fake user identity by name, postcode, and DOB. |
 | `/api/fake/doctor-calendar` | Fake doctor calendar lookup. |
 | `/api/fake/appointments` | Fake appointment booking API. |
 | `/api/fake/medical-results` | Fake medical results lookup. |

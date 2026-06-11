@@ -215,7 +215,7 @@ async def fake_verify_patient(payload: dict[str, Any]) -> dict[str, Any]:
     patient = verify_patient_identity(
         name=str(payload.get("name") or ""),
         date_of_birth=str(payload.get("date_of_birth") or ""),
-        phone_last4=str(payload.get("phone_last4") or ""),
+        postcode=str(payload.get("postcode") or ""),
     )
     if not patient:
         raise HTTPException(404, "No matching fake patient found")

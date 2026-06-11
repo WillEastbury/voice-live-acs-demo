@@ -43,7 +43,7 @@
       <input id="patientDob" placeholder="Date of birth (YYYY-MM-DD)" value="1978-09-03">
     </div>
     <div class="row">
-      <input id="patientPhoneLast4" placeholder="Last 4 registered phone digits" value="2002">
+      <input id="patientPostcode" placeholder="Postcode" value="BS1 4ST">
       <button id="linkPatient" disabled>Verify and link patient</button>
     </div>
     <label for="greeting">Custom greeting</label>
@@ -88,7 +88,7 @@ const sendEl = document.getElementById('send');
 const textEl = document.getElementById('text');
 const patientNameEl = document.getElementById('patientName');
 const patientDobEl = document.getElementById('patientDob');
-const patientPhoneLast4El = document.getElementById('patientPhoneLast4');
+const patientPostcodeEl = document.getElementById('patientPostcode');
 const linkPatientEl = document.getElementById('linkPatient');
 const contextEl = document.getElementById('context');
 const greetingEl = document.getElementById('greeting');
@@ -243,7 +243,7 @@ async function verifyAndLinkPatient() {
     body: JSON.stringify({
       name: patientNameEl.value,
       date_of_birth: patientDobEl.value,
-      phone_last4: patientPhoneLast4El.value,
+      postcode: patientPostcodeEl.value,
     }),
   });
   if (!response.ok) {
