@@ -13,7 +13,11 @@
     button.secondary { background: #475569; }
     input, select, textarea { background: #0f172a; color: #f8fafc; width: 100%; box-sizing: border-box; }
     textarea { min-height: 74px; }
-    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+    .tab { background: #334155; border-color: #475569; }
+    .tab.active { background: #2563eb; border-color: #60a5fa; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
     .card { background: #1f2937; border: 1px solid #334155; border-radius: 18px; padding: 18px; }
     .row { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 10px 0; }
     .row3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -36,8 +40,15 @@
   </div>
   <div id="status">Loading...</div>
 
-  <section class="grid">
-    <div class="card">
+  <nav class="tabs" aria-label="Fake system tabs">
+    <button class="tab active" data-tab="calendar">Doctor calendar</button>
+    <button class="tab" data-tab="results">Medical results</button>
+    <button class="tab" data-tab="escalations">Escalations</button>
+    <button class="tab" data-tab="prescriptions">Prescriptions</button>
+    <button class="tab" data-tab="raw">Raw state</button>
+  </nav>
+
+  <section class="card tab-panel active" id="tab-calendar">
       <h2>Doctor calendar</h2>
       <div class="row">
         <input id="slotSpecialty" placeholder="Specialty" value="GP">
@@ -50,9 +61,9 @@
       </div>
       <button id="addSlot">Add slot</button>
       <table id="slotsTable"></table>
-    </div>
+  </section>
 
-    <div class="card">
+  <section class="card tab-panel" id="tab-results">
       <h2>Medical results</h2>
       <div class="row">
         <input id="resultPatient" placeholder="Patient reference" value="demo-patient">
@@ -65,9 +76,9 @@
       <input id="resultStatus" placeholder="Status" value="within demo range">
       <p><button id="addResult">Add result</button></p>
       <table id="resultsTable"></table>
-    </div>
+  </section>
 
-    <div class="card">
+  <section class="card tab-panel" id="tab-escalations">
       <h2>Escalation callback</h2>
       <textarea id="escalationReason">Patient wants to speak to a nurse about demo symptoms.</textarea>
       <div class="row">
@@ -76,9 +87,9 @@
       </div>
       <button id="addEscalation">Create escalation</button>
       <table id="escalationsTable"></table>
-    </div>
+  </section>
 
-    <div class="card">
+  <section class="card tab-panel" id="tab-prescriptions">
       <h2>Prescription requests</h2>
       <div class="row">
         <input id="rxMedication" placeholder="Medication" value="demo inhaler">
@@ -88,9 +99,14 @@
       <textarea id="rxReason">Repeat prescription demo request.</textarea>
       <button id="addPrescription">Create request</button>
       <table id="prescriptionsTable"></table>
-    </div>
   </section>
-</main>
+
+  <section class="card tab-panel" id="tab-raw">
+    <h2>Raw fake system state</h2>
+    <p class="muted">Useful for showing exactly what the agent tools can see.</p>
+    <pre id="rawState"></pre>
+  </section>
+ </main>
 <script>
 const statusEl = document.getElementById('status');
 let state = {};
@@ -120,12 +136,22 @@ function table(id, headers, rows) {
     rows.map(row => `<tr>${headers.map(h => `<td>${cell(row[h])}</td>`).join('')}</tr>`).join('');
 }
 
+function activateTab(name) {
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.tab === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.id === `tab-${name}`);
+  });
+}
+
 async function refresh() {
   state = await api('/api/fake/state');
   table('slotsTable', ['id', 'specialty', 'doctor', 'time', 'mode', 'urgency', 'status'], state.calendar_slots);
   table('resultsTable', ['id', 'patient_reference', 'result_type', 'name', 'value', 'status'], state.medical_results);
   table('escalationsTable', ['ticket_id', 'reason', 'urgency', 'callback_number', 'created_at'], state.escalations);
   table('prescriptionsTable', ['request_id', 'medication', 'dosage', 'pharmacy', 'reason', 'status'], state.prescription_requests);
+  document.getElementById('rawState').textContent = JSON.stringify(state, null, 2);
   setStatus(`Loaded ${state.calendar_slots.length} slots, ${state.medical_results.length} results, ${state.escalations.length} escalations, ${state.prescription_requests.length} prescription requests.`);
 }
 
@@ -194,6 +220,9 @@ document.getElementById('addSlot').addEventListener('click', () => addSlot().cat
 document.getElementById('addResult').addEventListener('click', () => addResult().catch(err => setStatus(err.message)));
 document.getElementById('addEscalation').addEventListener('click', () => addEscalation().catch(err => setStatus(err.message)));
 document.getElementById('addPrescription').addEventListener('click', () => addPrescription().catch(err => setStatus(err.message)));
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => activateTab(tab.dataset.tab));
+});
 refresh().catch(err => setStatus(err.message));
 </script>
 </body>

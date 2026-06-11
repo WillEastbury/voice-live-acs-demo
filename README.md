@@ -97,13 +97,14 @@ The image was built by a one-shot Kubernetes build job on the existing ARM64 AKS
 
 The browser voice chat includes a custom greeting box and a live context editor. The greeting is spoken when the session starts and can be replayed during the call. Apply context before or during a voice session to update the Voice Live instructions, or inject the same context as a simulated tool result for demos.
 
-The fake systems GUI at `/systems` lets a presenter shape the demo live:
+The tabbed fake systems GUI at `/systems` lets a presenter shape the demo live:
 
 - Add doctor calendar slots that the `get_doctor_calendar` tool can return.
 - Add synthetic medical results that the `get_medical_results` tool can return.
 - Create fake escalation callback tickets.
 - Create fake prescription requests.
 - Reset the in-memory demo state back to defaults.
+- Inspect the raw in-memory state that the Voice Live tools can see.
 
 The state is intentionally in-memory and demo-only. It is shared by the browser GUI, REST APIs, and Voice Live tools while the pod is running.
 
