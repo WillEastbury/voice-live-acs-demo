@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 import logging
+import random
 from typing import Any
 
 import websockets
@@ -11,9 +12,19 @@ from azure.identity.aio import DefaultAzureCredential
 from starlette.websockets import WebSocket
 
 from .config import Settings
-from .fake_medical_tools import TOOL_DEFINITIONS, call_tool_json
+from .fake_medical_tools import TOOL_DEFINITIONS, call_tool_json, get_patient
 
 logger = logging.getLogger("voice-live-acs-demo.bridge")
+
+BRITISH_VOICES = [
+    "en-GB-SoniaNeural",
+    "en-GB-RyanNeural",
+    "en-GB-LibbyNeural",
+    "en-GB-AbbiNeural",
+    "en-GB-AlfieNeural",
+    "en-GB-OliverNeural",
+    "en-GB-MaisieNeural",
+]
 
 
 class VoiceLiveBridge:
@@ -23,6 +34,8 @@ class VoiceLiveBridge:
         self.credential: DefaultAzureCredential | None = None
         self.voice_live = None
         self.completed_tool_calls: set[str] = set()
+        self.patient_reference: str | None = None
+        self.session_voice = random.choice(BRITISH_VOICES)
 
     async def run(self) -> None:
         headers = await self._auth_headers()
@@ -84,7 +97,7 @@ class VoiceLiveBridge:
                     "tools": TOOL_DEFINITIONS,
                     "tool_choice": "auto",
                     "voice": {
-                        "name": self.settings.voice_live_voice,
+                        "name": self.session_voice,
                         "type": "azure-standard",
                     },
                 },
@@ -167,7 +180,7 @@ class VoiceLiveBridge:
             return True
 
         self.completed_tool_calls.add(call_id)
-        output = call_tool_json(name, arguments)
+        output = call_tool_json(name, arguments, self.patient_reference)
         logger.info("Voice Live tool call: %s(%s) -> %s", name, arguments, output)
         await self._send_voice_live(
             {
@@ -225,12 +238,27 @@ class BrowserVoiceBridge(VoiceLiveBridge):
         headers = await self._auth_headers()
         self.voice_live = await self._connect_voice_live(headers)
         await self._configure_session()
+        await self._safe_browser_send(
+            {"type": "event", "event": "voice.selected", "voice": self.session_voice}
+        )
 
         try:
-            await asyncio.gather(
-                self._browser_to_voice_live(),
-                self._voice_live_to_browser(),
+            browser_task = asyncio.create_task(self._browser_to_voice_live())
+            voice_task = asyncio.create_task(self._voice_live_to_browser())
+            done, pending = await asyncio.wait(
+                {browser_task, voice_task},
+                return_when=asyncio.FIRST_COMPLETED,
             )
+            for task in done:
+                exc = None if task.cancelled() else task.exception()
+                if exc:
+                    logger.exception("Browser bridge task failed", exc_info=exc)
+                    await self._safe_browser_send({"type": "error", "error": str(exc)})
+                else:
+                    await self._safe_browser_send({"type": "event", "event": "bridge.completed"})
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
         finally:
             if self.voice_live:
                 await self.voice_live.close()
@@ -259,9 +287,31 @@ class BrowserVoiceBridge(VoiceLiveBridge):
                 )
                 continue
 
+            if message_type == "patient_identity":
+                patient_reference = str(message.get("patient_reference") or "").strip()
+                self.patient_reference = patient_reference or None
+                await self._configure_session()
+                await self.acs_websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "event",
+                            "event": "patient.linked" if self.patient_reference else "patient.cleared",
+                            "patient": get_patient(self.patient_reference) if self.patient_reference else None,
+                        }
+                    )
+                )
+                continue
+
             if message_type == "greeting":
                 greeting = str(message.get("text") or "").strip()
                 if greeting:
+                    patient_name = None
+                    if self.patient_reference:
+                        patient = get_patient(self.patient_reference)
+                        patient_name = (patient or {}).get("name")
+                    personalized = greeting
+                    if patient_name:
+                        personalized = f"Address the caller as {patient_name}. {greeting}"
                     await self._send_voice_live(
                         {
                             "type": "conversation.item.create",
@@ -274,7 +324,7 @@ class BrowserVoiceBridge(VoiceLiveBridge):
                                         "text": (
                                             "Use the following as your opening greeting. "
                                             "Speak it naturally and do not mention that it came from a control panel: "
-                                            f"{greeting}"
+                                            f"{personalized}"
                                         ),
                                     }
                                 ],
@@ -336,6 +386,15 @@ class BrowserVoiceBridge(VoiceLiveBridge):
                 "Presenter-supplied live demo context. Treat this as current, authoritative "
                 f"state for this session:\n{self.demo_context}"
             )
+        if self.patient_reference:
+            patient = get_patient(self.patient_reference)
+            patient_context = patient or {"id": self.patient_reference, "name": self.patient_reference}
+            instructions = (
+                f"{instructions}\n\n"
+                "The caller has identified themselves and linked the following synthetic demo medical record. "
+                "Use this patient_reference for tool calls unless the user explicitly chooses another demo patient. "
+                f"Patient link: {json.dumps(patient_context)}"
+            )
 
         await self._send_voice_live(
             {
@@ -354,7 +413,7 @@ class BrowserVoiceBridge(VoiceLiveBridge):
                     "tools": TOOL_DEFINITIONS,
                     "tool_choice": "auto",
                     "voice": {
-                        "name": self.settings.voice_live_voice,
+                        "name": self.session_voice,
                         "type": "azure-standard",
                     },
                 },
@@ -401,9 +460,13 @@ class BrowserVoiceBridge(VoiceLiveBridge):
 
             if event_type == "error":
                 logger.error("Voice Live browser error: %s", event)
-                await self.acs_websocket.send_text(
-                    json.dumps({"type": "error", "error": event})
-                )
+                await self._safe_browser_send({"type": "error", "error": event})
+
+    async def _safe_browser_send(self, payload: dict[str, Any]) -> None:
+        try:
+            await self.acs_websocket.send_text(json.dumps(payload))
+        except Exception:
+            logger.debug("Could not send browser WebSocket payload", exc_info=True)
 
 
 def pcm24k_to_wav_bytes(pcm: bytes) -> bytes:

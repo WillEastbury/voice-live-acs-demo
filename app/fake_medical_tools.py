@@ -29,6 +29,10 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     "type": "string",
                     "description": "Preferred appointment date or natural date phrase.",
                 },
+                "patient_reference": {
+                    "type": "string",
+                    "description": "Demo patient reference if the caller has linked records.",
+                },
                 "urgency": {
                     "type": "string",
                     "enum": ["routine", "soon", "urgent"],
@@ -72,6 +76,10 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     "type": "string",
                     "description": "Optional demo callback number supplied by the user.",
                 },
+                "patient_reference": {
+                    "type": "string",
+                    "description": "Demo patient reference if linked.",
+                },
             },
             "required": ["reason"],
         },
@@ -87,6 +95,10 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "dosage": {"type": "string"},
                 "pharmacy": {"type": "string"},
                 "reason": {"type": "string"},
+                "patient_reference": {
+                    "type": "string",
+                    "description": "Demo patient reference if linked.",
+                },
             },
             "required": ["medication"],
         },
@@ -95,6 +107,15 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
 
 
 DEFAULT_DEMO_STATE: dict[str, Any] = {
+    "demo_config": {
+        "greeting": "Hello, you're through to the demo healthcare assistant. I can help with fake appointment availability, fake test results, callback escalation, and prescription request demos. How can I help?",
+        "context": "Demo clinic context:\n- Patient is using fake demo data only.\n- Available departments: GP, cardiology, dermatology, pharmacy.\n- Do not give real medical advice.\n- For urgent or worsening symptoms, advise local urgent care/emergency services.\n\nIf asked to use tools, call the fake healthcare APIs and explain that results are synthetic demo data.",
+    },
+    "patients": [
+        {"id": "demo-patient", "name": "Alex Demo", "date_of_birth": "1984-04-12", "nhs_number": "DEMO-0001", "notes": "Default demo patient."},
+        {"id": "pat-amelia", "name": "Amelia Green", "date_of_birth": "1978-09-03", "nhs_number": "DEMO-0002", "notes": "Prefers morning calls."},
+        {"id": "pat-oliver", "name": "Oliver Brown", "date_of_birth": "1991-01-22", "nhs_number": "DEMO-0003", "notes": "Uses Riverside Pharmacy."},
+    ],
     "calendar_slots": [
         {"id": "slot-urgent-1", "specialty": "GP", "doctor": "Dr Patel", "time": "Today 16:20", "mode": "phone", "urgency": "urgent", "status": "available"},
         {"id": "slot-urgent-2", "specialty": "GP", "doctor": "Dr Morgan", "time": "Tomorrow 09:10", "mode": "clinic", "urgency": "urgent", "status": "available"},
@@ -107,6 +128,8 @@ DEFAULT_DEMO_STATE: dict[str, Any] = {
         {"id": "res-bloods-wcc", "patient_reference": "demo-patient", "result_type": "bloods", "name": "White cell count", "value": "6.2 x10^9/L", "status": "within demo range"},
         {"id": "res-chol-total", "patient_reference": "demo-patient", "result_type": "cholesterol", "name": "Total cholesterol", "value": "4.8 mmol/L", "status": "within demo range"},
         {"id": "res-xray", "patient_reference": "demo-patient", "result_type": "xray", "name": "Chest X-ray", "value": "No acute demo abnormality reported", "status": "reviewed"},
+        {"id": "res-amelia-bp", "patient_reference": "pat-amelia", "result_type": "bloods", "name": "HbA1c", "value": "38 mmol/mol", "status": "within demo range"},
+        {"id": "res-oliver-lipids", "patient_reference": "pat-oliver", "result_type": "cholesterol", "name": "LDL", "value": "2.1 mmol/L", "status": "within demo range"},
     ],
     "escalations": [],
     "prescription_requests": [],
@@ -124,6 +147,63 @@ def reset_demo_state() -> dict[str, Any]:
     DEMO_STATE.clear()
     DEMO_STATE.update(deepcopy(DEFAULT_DEMO_STATE))
     return demo_state()
+
+
+def update_demo_config(config: dict[str, Any]) -> dict[str, Any]:
+    demo_config = DEMO_STATE.setdefault("demo_config", {})
+    if "greeting" in config:
+        demo_config["greeting"] = str(config.get("greeting") or "")
+    if "context" in config:
+        demo_config["context"] = str(config.get("context") or "")
+    return {"disclaimer": DISCLAIMER, "demo_config": deepcopy(demo_config)}
+
+
+def get_patient(patient_reference: str) -> dict[str, Any] | None:
+    patient_key = patient_reference.strip().lower()
+    for patient in DEMO_STATE["patients"]:
+        if patient.get("id", "").lower() == patient_key or patient.get("name", "").lower() == patient_key:
+            return deepcopy(patient)
+    return None
+
+
+def add_patient(patient: dict[str, Any]) -> dict[str, Any]:
+    patient_id = str(patient.get("id") or "pat-" + uuid.uuid4().hex[:8]).strip()
+    record = {
+        "id": patient_id,
+        "name": str(patient.get("name") or patient_id),
+        "date_of_birth": str(patient.get("date_of_birth") or "not specified"),
+        "nhs_number": str(patient.get("nhs_number") or "DEMO-" + uuid.uuid4().hex[:4].upper()),
+        "notes": str(patient.get("notes") or ""),
+    }
+    DEMO_STATE["patients"].append(record)
+    return {"disclaimer": DISCLAIMER, "patient": deepcopy(record)}
+
+
+def patient_view(patient_reference: str) -> dict[str, Any] | None:
+    patient = get_patient(patient_reference)
+    if not patient:
+        return None
+    patient_id = patient["id"].lower()
+    return {
+        "disclaimer": DISCLAIMER,
+        "patient": patient,
+        "medical_results": [
+            deepcopy(result)
+            for result in DEMO_STATE["medical_results"]
+            if result.get("patient_reference", "").lower() == patient_id
+        ],
+        "escalations": [
+            deepcopy(escalation)
+            for escalation in DEMO_STATE["escalations"]
+            if escalation.get("patient_reference", "").lower() == patient_id
+        ],
+        "prescription_requests": [
+            deepcopy(request)
+            for request in DEMO_STATE["prescription_requests"]
+            if request.get("patient_reference", "").lower() == patient_id
+        ],
+        "available_calendar_slots": deepcopy(DEMO_STATE["calendar_slots"]),
+    }
 
 
 def add_calendar_slot(slot: dict[str, Any]) -> dict[str, Any]:
@@ -169,6 +249,7 @@ def get_doctor_calendar(
     specialty: str,
     preferred_date: str | None = None,
     urgency: str = "routine",
+    patient_reference: str | None = None,
 ) -> dict[str, Any]:
     specialty_label = specialty.strip().title() if specialty else "Gp"
     slots = [
@@ -182,6 +263,7 @@ def get_doctor_calendar(
         "disclaimer": DISCLAIMER,
         "specialty": specialty_label,
         "preferred_date": preferred_date or "first available",
+        "patient_reference": patient_reference or "not linked",
         "urgency": urgency,
         "available_slots": deepcopy(slots),
         "booking_policy": "Ask the user which slot they prefer before confirming a booking.",
@@ -213,6 +295,7 @@ def escalate_to_person(
     reason: str,
     urgency: str = "routine",
     callback_number: str | None = None,
+    patient_reference: str | None = None,
 ) -> dict[str, Any]:
     ticket_id = "ESC-" + uuid.uuid4().hex[:8].upper()
     record = {
@@ -220,6 +303,7 @@ def escalate_to_person(
         "disclaimer": DISCLAIMER,
         "ticket_id": ticket_id,
         "reason": reason,
+        "patient_reference": patient_reference or "not linked",
         "urgency": urgency,
         "callback_number": callback_number or "not provided",
         "created_at": datetime.now(UTC).isoformat(),
@@ -234,6 +318,7 @@ def request_prescription(
     dosage: str | None = None,
     pharmacy: str | None = None,
     reason: str | None = None,
+    patient_reference: str | None = None,
 ) -> dict[str, Any]:
     request_id = "RX-" + uuid.uuid4().hex[:8].upper()
     record = {
@@ -241,6 +326,7 @@ def request_prescription(
         "disclaimer": DISCLAIMER,
         "request_id": request_id,
         "medication": medication,
+        "patient_reference": patient_reference or "not linked",
         "dosage": dosage or "not specified",
         "pharmacy": pharmacy or "not specified",
         "reason": reason or "not specified",
@@ -251,7 +337,14 @@ def request_prescription(
     return record
 
 
-def call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+def _with_patient_default(arguments: dict[str, Any], patient_reference: str | None) -> dict[str, Any]:
+    if patient_reference and not arguments.get("patient_reference"):
+        return {**arguments, "patient_reference": patient_reference}
+    return arguments
+
+
+def call_tool(name: str, arguments: dict[str, Any], patient_reference: str | None = None) -> dict[str, Any]:
+    arguments = _with_patient_default(arguments, patient_reference)
     if name == "get_doctor_calendar":
         return get_doctor_calendar(**arguments)
     if name == "get_medical_results":
@@ -266,7 +359,7 @@ def call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def call_tool_json(name: str, arguments_json: str | None) -> str:
+def call_tool_json(name: str, arguments_json: str | None, patient_reference: str | None = None) -> str:
     try:
         arguments = json.loads(arguments_json or "{}")
     except json.JSONDecodeError as exc:
@@ -276,4 +369,4 @@ def call_tool_json(name: str, arguments_json: str | None) -> str:
                 "error": f"Invalid tool arguments JSON: {exc}",
             }
         )
-    return json.dumps(call_tool(name, arguments))
+    return json.dumps(call_tool(name, arguments, patient_reference))

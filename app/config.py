@@ -79,7 +79,7 @@ def get_settings() -> Settings:
         voice_live_endpoint=required("VOICE_LIVE_ENDPOINT"),
         voice_live_api_key=os.getenv("VOICE_LIVE_API_KEY"),
         voice_live_model=os.getenv("VOICE_LIVE_MODEL", "gpt-realtime-mini"),
-        voice_live_voice=os.getenv("VOICE_LIVE_VOICE", "en-US-AvaNeural"),
+        voice_live_voice=os.getenv("VOICE_LIVE_VOICE", "en-GB-SoniaNeural"),
         voice_live_instructions=os.getenv(
             "VOICE_LIVE_INSTRUCTIONS",
             "You are a concise demo voice control agent.",

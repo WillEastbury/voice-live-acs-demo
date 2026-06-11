@@ -86,25 +86,28 @@ The app is deployed to the existing AKS cluster and existing nginx ingress/LB:
 | AKS cluster | `picowal-cluster` in `tileforge-rg` |
 | Namespace | `voice-live-demo` |
 | Image | `tileforgeacr.azurecr.io/voice-live-acs-demo` |
-| Public URL | `https://voice-live-acs.demos.wavefunctionlabs.com` |
+| Public URL / merged console | `https://voice-live-acs.demos.wavefunctionlabs.com` |
 | ACS incoming webhook | `https://voice-live-acs.demos.wavefunctionlabs.com/api/incoming-call` |
 | ACS media WebSocket | `wss://voice-live-acs.demos.wavefunctionlabs.com/ws/acs-media` |
-| Browser voice chat | `https://voice-live-acs.demos.wavefunctionlabs.com/voice` |
+| Browser voice chat alias | `https://voice-live-acs.demos.wavefunctionlabs.com/voice` |
 | Fake systems GUI | `https://voice-live-acs.demos.wavefunctionlabs.com/systems` |
+| Route/service mappings | `https://voice-live-acs.demos.wavefunctionlabs.com/api/routes` |
 | Fake API index | `https://voice-live-acs.demos.wavefunctionlabs.com/api/fake` |
 
 The image was built by a one-shot Kubernetes build job on the existing ARM64 AKS nodes and pushed to the existing `tileforgeacr` registry. No new load balancer or persistent compute was created.
 
-The browser voice chat includes a custom greeting box and a live context editor. The greeting is spoken when the session starts and can be replayed during the call. Apply context before or during a voice session to update the Voice Live instructions, or inject the same context as a simulated tool result for demos.
+The browser voice chat includes a custom greeting box, patient selector, and live context editor. Each browser voice session randomly chooses an en-GB Azure voice and personalizes the greeting with the linked synthetic patient's name. The greeting is spoken when the session starts and can be replayed during the call. Greeting and context can be saved into the in-memory demo configuration. Apply context before or during a voice session to update the Voice Live instructions, or inject the same context as a simulated tool result for demos.
 
-The tabbed fake systems GUI at `/systems` lets a presenter shape the demo live:
+The main `/voice` page is a merged tabbed console with **Voice chat** and **Fake systems** tabs. The standalone tabbed fake systems GUI remains available at `/systems` and lets a presenter shape the demo live:
 
+- Add synthetic patients that can be selected and linked in the voice session.
 - Add doctor calendar slots that the `get_doctor_calendar` tool can return.
 - Add synthetic medical results that the `get_medical_results` tool can return.
 - Create fake escalation callback tickets.
 - Create fake prescription requests.
 - Reset the in-memory demo state back to defaults.
 - Inspect the raw in-memory state that the Voice Live tools can see.
+- Open a patient view showing the selected synthetic patient profile plus linked results, escalations, and prescription requests.
 
 The state is intentionally in-memory and demo-only. It is shared by the browser GUI, REST APIs, and Voice Live tools while the pod is running.
 
@@ -119,7 +122,7 @@ Use `.env.example` as the template:
 | `VOICE_LIVE_ENDPOINT` | Azure AI/Voice Live endpoint. |
 | `VOICE_LIVE_API_KEY` | Optional API key for Voice Live. Keep this secret. If omitted, the app uses `DefaultAzureCredential`. |
 | `VOICE_LIVE_MODEL` | Voice Live model, for example `gpt-realtime-mini`. |
-| `VOICE_LIVE_VOICE` | Azure TTS voice name. |
+| `VOICE_LIVE_VOICE` | Azure TTS voice name. Defaults to British English `en-GB-SoniaNeural`. |
 | `VOICE_LIVE_INSTRUCTIONS` | Base system prompt for the agent. |
 | `PUBLIC_HOST` | Public HTTPS URL used for ACS callbacks and browser WebSockets. |
 | `ACS_PHONE_NUMBER` | Optional E.164 ACS number for outbound calls. |
@@ -146,7 +149,7 @@ Use `.env.example` as the template:
 4. Open the browser voice demo:
 
    ```text
-   http://localhost:8080/voice
+   http://localhost:8080/
    ```
 
 5. Register ACS incoming call events once the public URL is live:
@@ -205,9 +208,10 @@ kubectl -n voice-live-demo create secret generic voice-live-acs-demo-env \
 
 | Endpoint | Purpose |
 |---|---|
-| `/` | JSON metadata showing configured callback/WebSocket URLs. |
+| `/` | Merged browser voice and fake systems demo console. |
+| `/api/routes` | JSON metadata showing configured callback/WebSocket URLs and service mappings. |
 | `/healthz` | Health probe. |
-| `/voice` | Browser voice chat UI. |
+| `/voice` | Browser voice chat UI alias for the merged console. |
 | `/systems` | Fake healthcare systems control panel. |
 | `/ws/browser-voice` | Browser voice WebSocket. |
 | `/api/incoming-call` | ACS incoming call Event Grid webhook. |

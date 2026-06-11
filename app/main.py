@@ -23,12 +23,16 @@ from .fake_medical_tools import (
     DISCLAIMER,
     add_calendar_slot,
     add_medical_result,
+    add_patient,
     demo_state,
     escalate_to_person,
     get_doctor_calendar,
     get_medical_results,
+    get_patient,
+    patient_view,
     request_prescription,
     reset_demo_state,
+    update_demo_config,
     update_record,
 )
 from .voice_live_bridge import BrowserVoiceBridge, VoiceLiveBridge
@@ -66,9 +70,20 @@ def media_streaming_options() -> MediaStreamingOptions:
 
 
 @app.get("/")
-async def root() -> dict[str, Any]:
+async def console_page() -> FileResponse:
+    return FileResponse(Path(__file__).resolve().parent.parent / "static" / "index.html")
+
+
+@app.get("/voice")
+async def voice_page() -> FileResponse:
+    return FileResponse(Path(__file__).resolve().parent.parent / "static" / "index.html")
+
+
+@app.get("/api/routes")
+async def routes() -> dict[str, Any]:
     return {
         "status": "ready",
+        "consoleUrl": settings.public_host.rstrip("/"),
         "incomingCallWebhook": settings.incoming_call_url,
         "callbackUrl": settings.callback_url,
         "mediaWebSocket": settings.media_websocket_url,
@@ -76,6 +91,7 @@ async def root() -> dict[str, Any]:
         "fakeSystemsUrl": f"{settings.public_host.rstrip('/')}/systems",
         "fakeMedicalApis": [
             "/api/fake/state",
+            "/api/fake/patients",
             "/api/fake/doctor-calendar",
             "/api/fake/medical-results",
             "/api/fake/escalate",
@@ -84,11 +100,6 @@ async def root() -> dict[str, Any]:
         "voiceLiveEndpoint": settings.voice_live_endpoint,
         "voiceLiveModel": settings.voice_live_model,
     }
-
-
-@app.get("/voice")
-async def voice_page() -> FileResponse:
-    return FileResponse(Path(__file__).resolve().parent.parent / "static" / "index.html")
 
 
 @app.get("/systems")
@@ -167,6 +178,25 @@ async def fake_add_doctor_calendar_slot(payload: dict[str, Any]) -> dict[str, An
     return add_calendar_slot(payload)
 
 
+@app.get("/api/fake/patients")
+async def fake_patients() -> dict[str, Any]:
+    state = demo_state()
+    return {"disclaimer": DISCLAIMER, "patients": state["patients"]}
+
+
+@app.post("/api/fake/patients")
+async def fake_add_patient(payload: dict[str, Any]) -> dict[str, Any]:
+    return add_patient(payload)
+
+
+@app.get("/api/fake/patients/{patient_reference}")
+async def fake_patient(patient_reference: str) -> dict[str, Any]:
+    view = patient_view(patient_reference)
+    if not view:
+        raise HTTPException(404, "patient not found")
+    return view
+
+
 @app.get("/api/fake/medical-results")
 async def fake_medical_results(
     result_type: str = "bloods",
@@ -215,6 +245,7 @@ async def fake_api_index() -> dict[str, Any]:
             "prescriptionRequest": "POST /api/fake/prescription-request",
             "state": "/api/fake/state",
             "reset": "POST /api/fake/reset",
+            "patients": "/api/fake/patients",
         },
     }
 
@@ -222,6 +253,11 @@ async def fake_api_index() -> dict[str, Any]:
 @app.get("/api/fake/state")
 async def fake_state() -> dict[str, Any]:
     return demo_state()
+
+
+@app.patch("/api/fake/config")
+async def fake_update_config(payload: dict[str, Any]) -> dict[str, Any]:
+    return update_demo_config(payload)
 
 
 @app.post("/api/fake/reset")

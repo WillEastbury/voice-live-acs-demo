@@ -6,7 +6,7 @@
   <title>Voice Live web chat</title>
   <style>
     body { color: #f4f7fb; background: #111827; font-family: system-ui, sans-serif; margin: 0; }
-    main { max-width: 760px; margin: 0 auto; padding: 40px 20px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 40px 20px; }
     button, input { border-radius: 10px; border: 1px solid #334155; font: inherit; padding: 12px 16px; }
     button { background: #2563eb; color: white; cursor: pointer; }
     button:disabled { background: #475569; cursor: not-allowed; }
@@ -16,20 +16,36 @@
     textarea { background: #0f172a; border: 1px solid #334155; border-radius: 10px; color: #f8fafc; font: inherit; min-height: 120px; padding: 12px; width: 100%; }
     #log { background: #020617; border-radius: 12px; min-height: 180px; padding: 16px; white-space: pre-wrap; }
     .muted { color: #94a3b8; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
+    .tab { background: #334155; border-color: #475569; }
+    .tab.active { background: #2563eb; border-color: #60a5fa; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    iframe { background: #111827; border: 1px solid #334155; border-radius: 18px; height: 840px; width: 100%; }
   </style>
 </head>
 <body>
 <main>
-  <h1>Voice Live web chat</h1>
-  <p class="muted">Browser microphone to Azure Voice Live, no ACS phone number required. <a href="/systems" style="color:#93c5fd">Open fake systems control panel</a>.</p>
-  <section class="card">
+  <h1>Voice Live healthcare demo console</h1>
+  <p class="muted">Browser microphone to Azure Voice Live, no ACS phone number required. The fake systems panel is in the second tab.</p>
+  <nav class="tabs" aria-label="Demo console tabs">
+    <button class="tab active" data-tab="voice">Voice chat</button>
+    <button class="tab" data-tab="systems">Fake systems</button>
+  </nav>
+  <section class="card tab-panel active" id="tab-voice">
     <div class="row">
       <button id="start">Start voice session</button>
       <button id="stop" disabled>Stop</button>
     </div>
+    <label for="patientReference">Identify and link demo medical record</label>
+    <div class="row">
+      <select id="patientReference"></select>
+      <button id="linkPatient" disabled>Link patient during session</button>
+    </div>
     <label for="greeting">Custom greeting</label>
     <textarea id="greeting">Hello, you're through to the demo healthcare assistant. I can help with fake appointment availability, fake test results, callback escalation, and prescription request demos. How can I help?</textarea>
     <div class="row">
+      <button id="saveGreeting">Save greeting</button>
       <button id="playGreeting" disabled>Play greeting now</button>
     </div>
     <label for="context">Conversation prompt/context</label>
@@ -41,6 +57,7 @@
 
 If asked to use tools, call the fake healthcare APIs and explain that results are synthetic demo data.</textarea>
     <div class="row">
+      <button id="saveContext">Save context</button>
       <button id="applyContext" disabled>Apply context to live session</button>
       <button id="fakeTool" disabled>Inject as fake tool result</button>
     </div>
@@ -51,6 +68,9 @@ If asked to use tools, call the fake healthcare APIs and explain that results ar
     </div>
     <div id="log">Idle.</div>
   </section>
+  <section class="tab-panel" id="tab-systems">
+    <iframe title="Fake healthcare systems" src="/systems"></iframe>
+  </section>
 </main>
 <script>
 const TARGET_RATE = 24000;
@@ -58,8 +78,12 @@ let ws, audioContext, source, processor, stream, nextPlaybackTime = 0;
 const logEl = document.getElementById('log');
 const startEl = document.getElementById('start');
 const stopEl = document.getElementById('stop');
+const saveGreetingEl = document.getElementById('saveGreeting');
+const saveContextEl = document.getElementById('saveContext');
 const sendEl = document.getElementById('send');
 const textEl = document.getElementById('text');
+const patientReferenceEl = document.getElementById('patientReference');
+const linkPatientEl = document.getElementById('linkPatient');
 const contextEl = document.getElementById('context');
 const greetingEl = document.getElementById('greeting');
 const applyContextEl = document.getElementById('applyContext');
@@ -69,6 +93,15 @@ const playGreetingEl = document.getElementById('playGreeting');
 function log(line) {
   logEl.textContent += `\n${new Date().toLocaleTimeString()} ${line}`;
   logEl.scrollTop = logEl.scrollHeight;
+}
+
+function activateTab(name) {
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.tab === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.id === `tab-${name}`);
+  });
 }
 
 function bytesToBase64(bytes) {
@@ -126,17 +159,19 @@ async function start() {
 
   ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/browser-voice`);
   ws.onopen = () => {
+    sendPatientIdentity();
     sendContextUpdate();
     sendGreeting();
     log('Connected. Speak naturally.');
   };
-  ws.onclose = () => log('Disconnected.');
+  ws.onclose = (event) => log(`Disconnected. code=${event.code || 'n/a'} reason=${event.reason || 'none'}`);
   ws.onerror = () => log('WebSocket error.');
   ws.onmessage = (event) => {
     const message = JSON.parse(event.data);
     if (message.type === 'audio') playPcm16(message.audio);
     if (message.type === 'transcript_delta') log(`Agent: ${message.text}`);
     if (message.type === 'event') log(`Event: ${message.event}`);
+    if (message.type === 'event' && message.event === 'voice.selected') log(`British voice selected: ${message.voice}`);
     if (message.type === 'tool_call') log(`Tool called: ${message.name}`);
     if (message.type === 'error') log(`Error: ${JSON.stringify(message.error)}`);
   };
@@ -154,6 +189,7 @@ async function start() {
   startEl.disabled = true;
   stopEl.disabled = false;
   sendEl.disabled = false;
+  linkPatientEl.disabled = false;
   applyContextEl.disabled = false;
   fakeToolEl.disabled = false;
   playGreetingEl.disabled = false;
@@ -168,6 +204,7 @@ function stop() {
   startEl.disabled = false;
   stopEl.disabled = true;
   sendEl.disabled = true;
+  linkPatientEl.disabled = true;
   applyContextEl.disabled = true;
   fakeToolEl.disabled = true;
   playGreetingEl.disabled = true;
@@ -187,6 +224,12 @@ function sendContextUpdate() {
   log('Context applied to session.');
 }
 
+function sendPatientIdentity() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: 'patient_identity', patient_reference: patientReferenceEl.value }));
+  log(`Linked patient: ${patientReferenceEl.value}`);
+}
+
 function injectFakeToolResult() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   ws.send(JSON.stringify({
@@ -203,15 +246,46 @@ function sendGreeting() {
   log('Greeting sent.');
 }
 
+async function saveDemoConfig(fields) {
+  const response = await fetch('/api/fake/config', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(fields),
+  });
+  if (!response.ok) throw new Error(await response.text());
+  log('Saved demo configuration.');
+}
+
 startEl.addEventListener('click', () => start().catch(err => log(`Start failed: ${err.message}`)));
 stopEl.addEventListener('click', stop);
 sendEl.addEventListener('click', sendText);
 applyContextEl.addEventListener('click', sendContextUpdate);
 fakeToolEl.addEventListener('click', injectFakeToolResult);
 playGreetingEl.addEventListener('click', sendGreeting);
+linkPatientEl.addEventListener('click', sendPatientIdentity);
+saveGreetingEl.addEventListener('click', () => saveDemoConfig({ greeting: greetingEl.value }).catch(err => log(`Save failed: ${err.message}`)));
+saveContextEl.addEventListener('click', () => saveDemoConfig({ context: contextEl.value }).catch(err => log(`Save failed: ${err.message}`)));
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => activateTab(tab.dataset.tab));
+});
 textEl.addEventListener('keydown', event => {
   if (event.key === 'Enter') sendText();
 });
+
+async function loadPatients() {
+  const response = await fetch('/api/fake/patients');
+  const data = await response.json();
+  patientReferenceEl.innerHTML = data.patients.map(patient =>
+    `<option value="${patient.id}">${patient.name} (${patient.id})</option>`
+  ).join('');
+}
+async function loadDemoConfig() {
+  const response = await fetch('/api/fake/state');
+  const data = await response.json();
+  if (data.demo_config?.greeting) greetingEl.value = data.demo_config.greeting;
+  if (data.demo_config?.context) contextEl.value = data.demo_config.context;
+}
+Promise.all([loadPatients(), loadDemoConfig()]).catch(err => log(`Could not load demo configuration: ${err.message}`));
 </script>
 </body>
 </html>

@@ -42,6 +42,7 @@
 
   <nav class="tabs" aria-label="Fake system tabs">
     <button class="tab active" data-tab="calendar">Doctor calendar</button>
+    <button class="tab" data-tab="patients">Patients</button>
     <button class="tab" data-tab="results">Medical results</button>
     <button class="tab" data-tab="escalations">Escalations</button>
     <button class="tab" data-tab="prescriptions">Prescriptions</button>
@@ -61,6 +62,28 @@
       </div>
       <button id="addSlot">Add slot</button>
       <table id="slotsTable"></table>
+  </section>
+
+  <section class="card tab-panel" id="tab-patients">
+      <h2>Patients</h2>
+      <p class="muted">Create synthetic users that can be selected in the voice demo and used to scope tool calls.</p>
+      <div class="row">
+        <input id="patientId" placeholder="Patient ID" value="pat-demo-new">
+        <input id="patientName" placeholder="Name" value="Jamie Demo">
+      </div>
+      <div class="row">
+        <input id="patientDob" placeholder="Date of birth" value="1988-06-20">
+        <input id="patientNhs" placeholder="Demo NHS/reference number" value="DEMO-0004">
+      </div>
+      <textarea id="patientNotes">Demo patient created from the fake systems GUI.</textarea>
+      <button id="addPatient">Add patient</button>
+      <h3>Patient view</h3>
+      <div class="row">
+        <select id="patientViewSelect"></select>
+        <button id="loadPatientView">Load patient view</button>
+      </div>
+      <div id="patientView"></div>
+      <table id="patientsTable"></table>
   </section>
 
   <section class="card tab-panel" id="tab-results">
@@ -136,6 +159,13 @@ function table(id, headers, rows) {
     rows.map(row => `<tr>${headers.map(h => `<td>${cell(row[h])}</td>`).join('')}</tr>`).join('');
 }
 
+function inlineTable(headers, rows) {
+  if (!rows.length) return '<p class="muted">No linked records.</p>';
+  return `<table><tr>${headers.map(h => `<th>${cell(h)}</th>`).join('')}</tr>` +
+    rows.map(row => `<tr>${headers.map(h => `<td>${cell(row[h])}</td>`).join('')}</tr>`).join('') +
+    '</table>';
+}
+
 function activateTab(name) {
   document.querySelectorAll('.tab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.tab === name);
@@ -147,12 +177,46 @@ function activateTab(name) {
 
 async function refresh() {
   state = await api('/api/fake/state');
+  document.getElementById('patientViewSelect').innerHTML = state.patients.map(patient =>
+    `<option value="${cell(patient.id)}">${cell(patient.name)} (${cell(patient.id)})</option>`
+  ).join('');
+  table('patientsTable', ['id', 'name', 'date_of_birth', 'nhs_number', 'notes'], state.patients);
   table('slotsTable', ['id', 'specialty', 'doctor', 'time', 'mode', 'urgency', 'status'], state.calendar_slots);
   table('resultsTable', ['id', 'patient_reference', 'result_type', 'name', 'value', 'status'], state.medical_results);
   table('escalationsTable', ['ticket_id', 'reason', 'urgency', 'callback_number', 'created_at'], state.escalations);
   table('prescriptionsTable', ['request_id', 'medication', 'dosage', 'pharmacy', 'reason', 'status'], state.prescription_requests);
   document.getElementById('rawState').textContent = JSON.stringify(state, null, 2);
-  setStatus(`Loaded ${state.calendar_slots.length} slots, ${state.medical_results.length} results, ${state.escalations.length} escalations, ${state.prescription_requests.length} prescription requests.`);
+  setStatus(`Loaded ${state.patients.length} patients, ${state.calendar_slots.length} slots, ${state.medical_results.length} results, ${state.escalations.length} escalations, ${state.prescription_requests.length} prescription requests.`);
+}
+
+async function loadPatientView() {
+  const patientId = document.getElementById('patientViewSelect').value;
+  const view = await api(`/api/fake/patients/${encodeURIComponent(patientId)}`);
+  document.getElementById('patientView').innerHTML = `
+    <h4>${cell(view.patient.name)} <span class="muted">(${cell(view.patient.id)})</span></h4>
+    <p><strong>DOB:</strong> ${cell(view.patient.date_of_birth)} · <strong>Reference:</strong> ${cell(view.patient.nhs_number)}</p>
+    <p>${cell(view.patient.notes)}</p>
+    <h4>Medical results</h4>
+    ${inlineTable(['id', 'result_type', 'name', 'value', 'status'], view.medical_results)}
+    <h4>Escalations</h4>
+    ${inlineTable(['ticket_id', 'reason', 'urgency', 'callback_number', 'created_at'], view.escalations)}
+    <h4>Prescription requests</h4>
+    ${inlineTable(['request_id', 'medication', 'dosage', 'pharmacy', 'reason', 'status'], view.prescription_requests)}
+  `;
+}
+
+async function addPatient() {
+  await api('/api/fake/patients', {
+    method: 'POST',
+    body: JSON.stringify({
+      id: document.getElementById('patientId').value,
+      name: document.getElementById('patientName').value,
+      date_of_birth: document.getElementById('patientDob').value,
+      nhs_number: document.getElementById('patientNhs').value,
+      notes: document.getElementById('patientNotes').value,
+    }),
+  });
+  await refresh();
 }
 
 async function addSlot() {
@@ -216,6 +280,8 @@ async function reset() {
 
 document.getElementById('refresh').addEventListener('click', () => refresh().catch(err => setStatus(err.message)));
 document.getElementById('reset').addEventListener('click', () => reset().catch(err => setStatus(err.message)));
+document.getElementById('addPatient').addEventListener('click', () => addPatient().catch(err => setStatus(err.message)));
+document.getElementById('loadPatientView').addEventListener('click', () => loadPatientView().catch(err => setStatus(err.message)));
 document.getElementById('addSlot').addEventListener('click', () => addSlot().catch(err => setStatus(err.message)));
 document.getElementById('addResult').addEventListener('click', () => addResult().catch(err => setStatus(err.message)));
 document.getElementById('addEscalation').addEventListener('click', () => addEscalation().catch(err => setStatus(err.message)));
