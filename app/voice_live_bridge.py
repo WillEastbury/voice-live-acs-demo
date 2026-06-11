@@ -21,7 +21,6 @@ BRITISH_VOICES = [
     "en-GB-RyanNeural",
     "en-GB-LibbyNeural",
     "en-GB-AbbiNeural",
-    "en-GB-OliverNeural",
 ]
 
 
