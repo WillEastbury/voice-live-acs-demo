@@ -105,6 +105,7 @@ The main `/voice` page is a merged tabbed console with **Voice chat** and **Fake
 - Add doctor calendar slots that the `get_doctor_calendar` tool can return.
 - Show booked appointments created by the `book_appointment` tool or the control panel.
 - Add synthetic medical results that the `get_medical_results` tool can return.
+- Add current prescriptions/medicines on a patient's fake record for repeat prescription demos.
 - Create fake escalation callback tickets.
 - Create fake prescription requests.
 - Reset the in-memory demo state back to defaults.
@@ -227,6 +228,7 @@ kubectl -n voice-live-demo create secret generic voice-live-acs-demo-env \
 | `/api/fake/doctor-calendar` | Fake doctor calendar lookup. |
 | `/api/fake/appointments` | Fake appointment booking API. |
 | `/api/fake/medical-results` | Fake medical results lookup. |
+| `/api/fake/current-prescriptions` | Add current fake prescriptions/medicines to a patient record. |
 | `/api/fake/escalate` | Fake human escalation callback request. |
 | `/api/fake/prescription-request` | Fake prescription request. |
 

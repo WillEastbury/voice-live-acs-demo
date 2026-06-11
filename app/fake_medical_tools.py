@@ -154,6 +154,11 @@ DEFAULT_DEMO_STATE: dict[str, Any] = {
         {"id": "res-amelia-bp", "patient_reference": "pat-amelia", "result_type": "bloods", "name": "HbA1c", "value": "38 mmol/mol", "status": "within demo range"},
         {"id": "res-oliver-lipids", "patient_reference": "pat-oliver", "result_type": "cholesterol", "name": "LDL", "value": "2.1 mmol/L", "status": "within demo range"},
     ],
+    "current_prescriptions": [
+        {"id": "med-amelia-inhaler", "patient_reference": "pat-amelia", "medication": "Salbutamol demo inhaler", "dosage": "Two puffs when required", "pharmacy": "Riverside Pharmacy", "status": "active"},
+        {"id": "med-oliver-statins", "patient_reference": "pat-oliver", "medication": "Atorvastatin demo tablets", "dosage": "20 mg once daily", "pharmacy": "Riverside Pharmacy", "status": "active"},
+        {"id": "med-demo-vitd", "patient_reference": "demo-patient", "medication": "Vitamin D demo capsules", "dosage": "One daily", "pharmacy": "Demo Pharmacy", "status": "active"},
+    ],
     "appointments": [],
     "escalations": [],
     "prescription_requests": [],
@@ -236,6 +241,11 @@ def patient_view(patient_reference: str) -> dict[str, Any] | None:
             for appointment in DEMO_STATE["appointments"]
             if appointment.get("patient_reference", "").lower() == patient_id
         ],
+        "current_prescriptions": [
+            deepcopy(prescription)
+            for prescription in DEMO_STATE["current_prescriptions"]
+            if prescription.get("patient_reference", "").lower() == patient_id
+        ],
         "escalations": [
             deepcopy(escalation)
             for escalation in DEMO_STATE["escalations"]
@@ -275,6 +285,19 @@ def add_medical_result(result: dict[str, Any]) -> dict[str, Any]:
     }
     DEMO_STATE["medical_results"].append(record)
     return {"disclaimer": DISCLAIMER, "result": deepcopy(record)}
+
+
+def add_current_prescription(prescription: dict[str, Any]) -> dict[str, Any]:
+    record = {
+        "id": prescription.get("id") or "med-" + uuid.uuid4().hex[:8],
+        "patient_reference": str(prescription.get("patient_reference") or "demo-patient"),
+        "medication": str(prescription.get("medication") or "Demo medication"),
+        "dosage": str(prescription.get("dosage") or "not specified"),
+        "pharmacy": str(prescription.get("pharmacy") or "Demo Pharmacy"),
+        "status": str(prescription.get("status") or "active"),
+    }
+    DEMO_STATE["current_prescriptions"].append(record)
+    return {"disclaimer": DISCLAIMER, "prescription": deepcopy(record)}
 
 
 def update_record(collection: str, record_id: str, updates: dict[str, Any]) -> dict[str, Any]:
@@ -407,15 +430,26 @@ def request_prescription(
     patient_reference: str | None = None,
 ) -> dict[str, Any]:
     request_id = "RX-" + uuid.uuid4().hex[:8].upper()
+    patient = patient_reference or "not linked"
+    current = next(
+        (
+            item
+            for item in DEMO_STATE["current_prescriptions"]
+            if item.get("patient_reference") == patient
+            and item.get("medication", "").lower() == medication.lower()
+        ),
+        None,
+    )
     record = {
         "id": request_id,
         "disclaimer": DISCLAIMER,
         "request_id": request_id,
         "medication": medication,
-        "patient_reference": patient_reference or "not linked",
-        "dosage": dosage or "not specified",
-        "pharmacy": pharmacy or "not specified",
+        "patient_reference": patient,
+        "dosage": dosage or (current or {}).get("dosage") or "not specified",
+        "pharmacy": pharmacy or (current or {}).get("pharmacy") or "not specified",
         "reason": reason or "not specified",
+        "matched_current_prescription_id": (current or {}).get("id", "none"),
         "status": "queued for fake clinician review",
         "next_step": "Tell the user this is only a demo request and would require clinician approval in a real system.",
     }

@@ -22,6 +22,7 @@ from .config import Settings, get_settings
 from .fake_medical_tools import (
     DISCLAIMER,
     add_calendar_slot,
+    add_current_prescription,
     add_medical_result,
     add_patient,
     book_appointment,
@@ -98,6 +99,7 @@ async def routes() -> dict[str, Any]:
             "/api/fake/doctor-calendar",
             "/api/fake/appointments",
             "/api/fake/medical-results",
+            "/api/fake/current-prescriptions",
             "/api/fake/escalate",
             "/api/fake/prescription-request",
         ],
@@ -241,6 +243,14 @@ async def fake_add_medical_result(payload: dict[str, Any]) -> dict[str, Any]:
     return add_medical_result(payload)
 
 
+@app.post("/api/fake/current-prescriptions")
+async def fake_add_current_prescription(payload: dict[str, Any]) -> dict[str, Any]:
+    medication = str(payload.get("medication") or "").strip()
+    if not medication:
+        raise HTTPException(400, "medication is required")
+    return add_current_prescription(payload)
+
+
 @app.post("/api/fake/escalate")
 async def fake_escalate(payload: dict[str, Any]) -> dict[str, Any]:
     return escalate_to_person(
@@ -275,6 +285,7 @@ async def fake_api_index() -> dict[str, Any]:
             "bookAppointment": "POST /api/fake/appointments",
             "medicalResults": "/api/fake/medical-results?result_type=bloods",
             "addMedicalResult": "POST /api/fake/medical-results",
+            "addCurrentPrescription": "POST /api/fake/current-prescriptions",
             "escalate": "POST /api/fake/escalate",
             "prescriptionRequest": "POST /api/fake/prescription-request",
             "state": "/api/fake/state",
