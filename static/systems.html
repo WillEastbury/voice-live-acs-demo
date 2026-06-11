@@ -96,8 +96,11 @@
       border-radius: 20px;
       padding: 16px;
     }
+    .section-grid > .form-card { display: none; }
+    .modal-content .form-card { display: block; }
     .form-card h3, .records-card h3 { font-size: 1rem; margin: 0 0 10px; }
     .form-card > p, .records-card > p { margin-top: 0; }
+    .section-grid > .records-card { grid-column: 1 / -1; }
     .row { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 12px 0; }
     .row3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .field { display: grid; gap: 6px; }
@@ -131,6 +134,32 @@
     .meta-tile span { color: var(--muted); display: block; font-size: .74rem; font-weight: 850; text-transform: uppercase; }
     .meta-tile strong { display: block; margin-top: 3px; }
     .linked-section { margin-top: 18px; }
+    .modal[hidden] { display: none; }
+    .modal {
+      align-items: center;
+      background: rgba(2, 6, 23, 0.72);
+      backdrop-filter: blur(18px);
+      display: flex;
+      inset: 0;
+      justify-content: center;
+      padding: 24px;
+      position: fixed;
+      z-index: 20;
+    }
+    .modal-dialog {
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.92));
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      box-shadow: var(--shadow);
+      max-height: min(86vh, 760px);
+      max-width: 760px;
+      overflow: auto;
+      padding: 18px;
+      width: min(100%, 760px);
+    }
+    .modal-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 10px; }
+    .modal-title { font-size: 1.15rem; font-weight: 850; letter-spacing: -0.03em; }
+    .icon-button { background: rgba(71, 85, 105, 0.56); box-shadow: none; line-height: 1; padding: 9px 12px; }
     @media (max-width: 880px) {
       .topbar, .stats, .row, .row3, .panel-head, .section-grid, .section-grid.wide-first, .patient-meta { grid-template-columns: 1fr; }
       .actions { justify-content: stretch; }
@@ -177,10 +206,13 @@
         <h2>Doctor calendar</h2>
         <p class="muted">Create appointment availability for the agent to offer after patient authentication.</p>
       </div>
-      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+      <div class="panel-actions">
+        <button class="open-modal" data-form-id="slotForm" data-modal-title="Add calendar slot">Add slot</button>
+        <button class="secondary panel-refresh">Refresh</button>
+      </div>
     </div>
     <div class="section-grid">
-      <div class="form-card">
+      <div class="form-card" id="slotForm">
         <h3>Add availability</h3>
         <div class="row">
           <label class="field"><span>Specialty</span><input id="slotSpecialty" value="GP"></label>
@@ -206,10 +238,13 @@
         <h2>Current prescriptions</h2>
         <p class="muted">Medicines already on a patient's demo record and available for repeat prescription requests.</p>
       </div>
-      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+      <div class="panel-actions">
+        <button class="open-modal" data-form-id="currentPrescriptionForm" data-modal-title="Add current prescription">Add current prescription</button>
+        <button class="secondary panel-refresh">Refresh</button>
+      </div>
     </div>
     <div class="section-grid">
-      <div class="form-card">
+      <div class="form-card" id="currentPrescriptionForm">
         <h3>Add current medication</h3>
         <div class="row">
           <label class="field"><span>Patient</span><select id="currentRxPatient"></select></label>
@@ -234,10 +269,13 @@
         <h2>Booked appointments</h2>
         <p class="muted">Appointments booked by the agent or this control panel are recorded here.</p>
       </div>
-      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+      <div class="panel-actions">
+        <button class="open-modal" data-form-id="appointmentForm" data-modal-title="Book appointment">Book appointment</button>
+        <button class="secondary panel-refresh">Refresh</button>
+      </div>
     </div>
     <div class="section-grid">
-      <div class="form-card">
+      <div class="form-card" id="appointmentForm">
         <h3>Book a slot manually</h3>
         <div class="row">
           <label class="field"><span>Available slot</span><select id="bookingSlot"></select></label>
@@ -259,10 +297,13 @@
         <h2>Patients</h2>
         <p class="muted">Create synthetic users, inspect their linked record, and choose who the voice demo should authenticate against.</p>
       </div>
-      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+      <div class="panel-actions">
+        <button class="open-modal" data-form-id="patientForm" data-modal-title="Add patient">Add patient</button>
+        <button class="secondary panel-refresh">Refresh</button>
+      </div>
     </div>
     <div class="section-grid wide-first">
-      <div class="form-card">
+      <div class="form-card" id="patientForm">
         <h3>Add patient</h3>
         <div class="row">
           <label class="field"><span>Patient ID</span><input id="patientId" value="pat-demo-new"></label>
@@ -300,10 +341,13 @@
         <h2>Medical results</h2>
         <p class="muted">Add synthetic results that can be retrieved once the patient is authenticated.</p>
       </div>
-      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+      <div class="panel-actions">
+        <button class="open-modal" data-form-id="resultForm" data-modal-title="Add medical result">Add result</button>
+        <button class="secondary panel-refresh">Refresh</button>
+      </div>
     </div>
     <div class="section-grid">
-      <div class="form-card">
+      <div class="form-card" id="resultForm">
         <h3>Add result</h3>
         <div class="row">
           <label class="field"><span>Patient reference</span><input id="resultPatient" value="demo-patient"></label>
@@ -329,10 +373,13 @@
         <h2>Escalation callback</h2>
         <p class="muted">Human handoff records are allowed before authentication and are used when callers seem frustrated.</p>
       </div>
-      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+      <div class="panel-actions">
+        <button class="open-modal" data-form-id="escalationForm" data-modal-title="Create escalation">Create escalation</button>
+        <button class="secondary panel-refresh">Refresh</button>
+      </div>
     </div>
     <div class="section-grid">
-      <div class="form-card">
+      <div class="form-card" id="escalationForm">
         <h3>Create callback</h3>
         <label class="field"><span>Reason</span><textarea id="escalationReason">Patient wants to speak to a nurse about demo symptoms.</textarea></label>
         <div class="row">
@@ -354,10 +401,13 @@
         <h2>Prescription requests</h2>
         <p class="muted">Requests created by the agent or presenter are queued for clinician review in the demo state.</p>
       </div>
-      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+      <div class="panel-actions">
+        <button class="open-modal" data-form-id="prescriptionForm" data-modal-title="Create prescription request">Create request</button>
+        <button class="secondary panel-refresh">Refresh</button>
+      </div>
     </div>
     <div class="section-grid">
-      <div class="form-card">
+      <div class="form-card" id="prescriptionForm">
         <h3>Create request</h3>
         <div class="row">
           <label class="field"><span>Medication</span><input id="rxMedication" value="demo inhaler"></label>
@@ -386,9 +436,24 @@
   </section>
   </div>
  </main>
+ <div class="modal" id="formModal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+   <div class="modal-dialog">
+     <div class="modal-head">
+       <div class="modal-title" id="modalTitle">Edit record</div>
+       <button class="icon-button" id="closeModal" type="button" aria-label="Close modal">Close</button>
+     </div>
+     <div class="modal-content" id="modalContent"></div>
+   </div>
+ </div>
 <script>
 const statusEl = document.getElementById('status');
+const formModalEl = document.getElementById('formModal');
+const modalTitleEl = document.getElementById('modalTitle');
+const modalContentEl = document.getElementById('modalContent');
+const closeModalEl = document.getElementById('closeModal');
 let state = {};
+let activeModalForm = null;
+let activeModalParent = null;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -411,6 +476,7 @@ async function addCurrentPrescription() {
     }),
   });
   await refresh();
+  closeFormModal();
 }
 
 function setStatus(message) {
@@ -446,6 +512,25 @@ function activateTab(name) {
   document.querySelectorAll('.tab-panel').forEach(panel => {
     panel.classList.toggle('active', panel.id === `tab-${name}`);
   });
+}
+
+function openFormModal(formId, title) {
+  const form = document.getElementById(formId);
+  if (!form) return;
+  activeModalForm = form;
+  activeModalParent = form.parentElement;
+  modalTitleEl.textContent = title;
+  modalContentEl.appendChild(form);
+  formModalEl.hidden = false;
+}
+
+function closeFormModal() {
+  if (activeModalForm && activeModalParent) {
+    activeModalParent.insertBefore(activeModalForm, activeModalParent.firstElementChild);
+  }
+  formModalEl.hidden = true;
+  activeModalForm = null;
+  activeModalParent = null;
 }
 
 async function refresh() {
@@ -488,6 +573,7 @@ async function bookAppointment() {
     }),
   });
   await refresh();
+  closeFormModal();
 }
 
 async function loadPatientView() {
@@ -527,6 +613,7 @@ async function addPatient() {
     }),
   });
   await refresh();
+  closeFormModal();
 }
 
 async function addSlot() {
@@ -542,6 +629,7 @@ async function addSlot() {
     }),
   });
   await refresh();
+  closeFormModal();
 }
 
 async function addResult() {
@@ -556,6 +644,7 @@ async function addResult() {
     }),
   });
   await refresh();
+  closeFormModal();
 }
 
 async function addEscalation() {
@@ -568,6 +657,7 @@ async function addEscalation() {
     }),
   });
   await refresh();
+  closeFormModal();
 }
 
 async function addPrescription() {
@@ -581,6 +671,7 @@ async function addPrescription() {
     }),
   });
   await refresh();
+  closeFormModal();
 }
 
 async function reset() {
@@ -589,6 +680,16 @@ async function reset() {
 }
 
 document.getElementById('refresh').addEventListener('click', () => refresh().catch(err => setStatus(err.message)));
+document.querySelectorAll('.open-modal').forEach(button => {
+  button.addEventListener('click', () => openFormModal(button.dataset.formId, button.dataset.modalTitle));
+});
+closeModalEl.addEventListener('click', closeFormModal);
+formModalEl.addEventListener('click', event => {
+  if (event.target === formModalEl) closeFormModal();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !formModalEl.hidden) closeFormModal();
+});
 document.querySelectorAll('.panel-refresh').forEach(button => {
   button.addEventListener('click', () => refresh().catch(err => setStatus(err.message)));
 });
