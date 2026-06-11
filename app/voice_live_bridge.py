@@ -22,7 +22,6 @@ BRITISH_VOICES = [
     "en-GB-LibbyNeural",
     "en-GB-AbbiNeural",
     "en-GB-OliverNeural",
-    "en-GB-MaisieNeural",
 ]
 
 
