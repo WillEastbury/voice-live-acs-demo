@@ -37,10 +37,14 @@
       <button id="start">Start voice session</button>
       <button id="stop" disabled>Stop</button>
     </div>
-    <label for="patientReference">Identify and link demo medical record</label>
+    <label>Identify and link demo medical record</label>
     <div class="row">
-      <select id="patientReference"></select>
-      <button id="linkPatient" disabled>Link patient during session</button>
+      <input id="patientName" placeholder="Full name" value="Amelia Green">
+      <input id="patientDob" placeholder="Date of birth (YYYY-MM-DD)" value="1978-09-03">
+    </div>
+    <div class="row">
+      <input id="patientPhoneLast4" placeholder="Last 4 registered phone digits" value="2002">
+      <button id="linkPatient" disabled>Verify and link patient</button>
     </div>
     <label for="greeting">Custom greeting</label>
     <textarea id="greeting">Hello, you're through to the demo healthcare assistant. I can help with fake appointment availability, fake test results, callback escalation, and prescription request demos. How can I help?</textarea>
@@ -82,7 +86,9 @@ const saveGreetingEl = document.getElementById('saveGreeting');
 const saveContextEl = document.getElementById('saveContext');
 const sendEl = document.getElementById('send');
 const textEl = document.getElementById('text');
-const patientReferenceEl = document.getElementById('patientReference');
+const patientNameEl = document.getElementById('patientName');
+const patientDobEl = document.getElementById('patientDob');
+const patientPhoneLast4El = document.getElementById('patientPhoneLast4');
 const linkPatientEl = document.getElementById('linkPatient');
 const contextEl = document.getElementById('context');
 const greetingEl = document.getElementById('greeting');
@@ -159,7 +165,7 @@ async function start() {
 
   ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/browser-voice`);
   ws.onopen = () => {
-    sendPatientIdentity();
+    verifyAndLinkPatient();
     sendContextUpdate();
     sendGreeting();
     log('Connected. Speak naturally.');
@@ -224,10 +230,28 @@ function sendContextUpdate() {
   log('Context applied to session.');
 }
 
-function sendPatientIdentity() {
+function sendPatientIdentity(patientReference, patientName) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify({ type: 'patient_identity', patient_reference: patientReferenceEl.value }));
-  log(`Linked patient: ${patientReferenceEl.value}`);
+  ws.send(JSON.stringify({ type: 'patient_identity', patient_reference: patientReference }));
+  log(`Linked patient: ${patientName || patientReference}`);
+}
+
+async function verifyAndLinkPatient() {
+  const response = await fetch('/api/fake/verify-patient', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: patientNameEl.value,
+      date_of_birth: patientDobEl.value,
+      phone_last4: patientPhoneLast4El.value,
+    }),
+  });
+  if (!response.ok) {
+    log(`Patient verification failed: ${await response.text()}`);
+    return;
+  }
+  const data = await response.json();
+  sendPatientIdentity(data.patient.id, data.patient.name);
 }
 
 function injectFakeToolResult() {
@@ -262,7 +286,7 @@ sendEl.addEventListener('click', sendText);
 applyContextEl.addEventListener('click', sendContextUpdate);
 fakeToolEl.addEventListener('click', injectFakeToolResult);
 playGreetingEl.addEventListener('click', sendGreeting);
-linkPatientEl.addEventListener('click', sendPatientIdentity);
+linkPatientEl.addEventListener('click', () => verifyAndLinkPatient().catch(err => log(`Patient verification failed: ${err.message}`)));
 saveGreetingEl.addEventListener('click', () => saveDemoConfig({ greeting: greetingEl.value }).catch(err => log(`Save failed: ${err.message}`)));
 saveContextEl.addEventListener('click', () => saveDemoConfig({ context: contextEl.value }).catch(err => log(`Save failed: ${err.message}`)));
 document.querySelectorAll('.tab').forEach(tab => {
@@ -272,20 +296,13 @@ textEl.addEventListener('keydown', event => {
   if (event.key === 'Enter') sendText();
 });
 
-async function loadPatients() {
-  const response = await fetch('/api/fake/patients');
-  const data = await response.json();
-  patientReferenceEl.innerHTML = data.patients.map(patient =>
-    `<option value="${patient.id}">${patient.name} (${patient.id})</option>`
-  ).join('');
-}
 async function loadDemoConfig() {
   const response = await fetch('/api/fake/state');
   const data = await response.json();
   if (data.demo_config?.greeting) greetingEl.value = data.demo_config.greeting;
   if (data.demo_config?.context) contextEl.value = data.demo_config.context;
 }
-Promise.all([loadPatients(), loadDemoConfig()]).catch(err => log(`Could not load demo configuration: ${err.message}`));
+loadDemoConfig().catch(err => log(`Could not load demo configuration: ${err.message}`));
 </script>
 </body>
 </html>

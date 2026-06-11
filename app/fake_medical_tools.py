@@ -62,6 +62,29 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "type": "function",
+        "name": "book_appointment",
+        "description": "Book a fake appointment for a linked demo patient and write it into the fake system.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "slot_id": {
+                    "type": "string",
+                    "description": "ID of an available slot returned by get_doctor_calendar.",
+                },
+                "patient_reference": {
+                    "type": "string",
+                    "description": "Demo patient reference if linked.",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Brief fake appointment reason.",
+                },
+            },
+            "required": ["slot_id"],
+        },
+    },
+    {
+        "type": "function",
         "name": "escalate_to_person",
         "description": "Create a fake callback/escalation ticket to a human staff member.",
         "parameters": {
@@ -112,9 +135,9 @@ DEFAULT_DEMO_STATE: dict[str, Any] = {
         "context": "Demo clinic context:\n- Patient is using fake demo data only.\n- Available departments: GP, cardiology, dermatology, pharmacy.\n- Do not give real medical advice.\n- For urgent or worsening symptoms, advise local urgent care/emergency services.\n\nIf asked to use tools, call the fake healthcare APIs and explain that results are synthetic demo data.",
     },
     "patients": [
-        {"id": "demo-patient", "name": "Alex Demo", "date_of_birth": "1984-04-12", "nhs_number": "DEMO-0001", "notes": "Default demo patient."},
-        {"id": "pat-amelia", "name": "Amelia Green", "date_of_birth": "1978-09-03", "nhs_number": "DEMO-0002", "notes": "Prefers morning calls."},
-        {"id": "pat-oliver", "name": "Oliver Brown", "date_of_birth": "1991-01-22", "nhs_number": "DEMO-0003", "notes": "Uses Riverside Pharmacy."},
+        {"id": "demo-patient", "name": "Alex Demo", "date_of_birth": "1984-04-12", "phone_last4": "1001", "nhs_number": "DEMO-0001", "notes": "Default demo patient."},
+        {"id": "pat-amelia", "name": "Amelia Green", "date_of_birth": "1978-09-03", "phone_last4": "2002", "nhs_number": "DEMO-0002", "notes": "Prefers morning calls."},
+        {"id": "pat-oliver", "name": "Oliver Brown", "date_of_birth": "1991-01-22", "phone_last4": "3003", "nhs_number": "DEMO-0003", "notes": "Uses Riverside Pharmacy."},
     ],
     "calendar_slots": [
         {"id": "slot-urgent-1", "specialty": "GP", "doctor": "Dr Patel", "time": "Today 16:20", "mode": "phone", "urgency": "urgent", "status": "available"},
@@ -131,6 +154,7 @@ DEFAULT_DEMO_STATE: dict[str, Any] = {
         {"id": "res-amelia-bp", "patient_reference": "pat-amelia", "result_type": "bloods", "name": "HbA1c", "value": "38 mmol/mol", "status": "within demo range"},
         {"id": "res-oliver-lipids", "patient_reference": "pat-oliver", "result_type": "cholesterol", "name": "LDL", "value": "2.1 mmol/L", "status": "within demo range"},
     ],
+    "appointments": [],
     "escalations": [],
     "prescription_requests": [],
 }
@@ -166,12 +190,27 @@ def get_patient(patient_reference: str) -> dict[str, Any] | None:
     return None
 
 
+def verify_patient_identity(name: str, date_of_birth: str, phone_last4: str) -> dict[str, Any] | None:
+    normalized_name = " ".join(name.strip().lower().split())
+    normalized_dob = date_of_birth.strip()
+    normalized_last4 = "".join(ch for ch in phone_last4 if ch.isdigit())[-4:]
+    for patient in DEMO_STATE["patients"]:
+        if (
+            " ".join(patient.get("name", "").lower().split()) == normalized_name
+            and patient.get("date_of_birth") == normalized_dob
+            and patient.get("phone_last4") == normalized_last4
+        ):
+            return deepcopy(patient)
+    return None
+
+
 def add_patient(patient: dict[str, Any]) -> dict[str, Any]:
     patient_id = str(patient.get("id") or "pat-" + uuid.uuid4().hex[:8]).strip()
     record = {
         "id": patient_id,
         "name": str(patient.get("name") or patient_id),
         "date_of_birth": str(patient.get("date_of_birth") or "not specified"),
+        "phone_last4": "".join(ch for ch in str(patient.get("phone_last4") or "0000") if ch.isdigit())[-4:],
         "nhs_number": str(patient.get("nhs_number") or "DEMO-" + uuid.uuid4().hex[:4].upper()),
         "notes": str(patient.get("notes") or ""),
     }
@@ -191,6 +230,11 @@ def patient_view(patient_reference: str) -> dict[str, Any] | None:
             deepcopy(result)
             for result in DEMO_STATE["medical_results"]
             if result.get("patient_reference", "").lower() == patient_id
+        ],
+        "appointments": [
+            deepcopy(appointment)
+            for appointment in DEMO_STATE["appointments"]
+            if appointment.get("patient_reference", "").lower() == patient_id
         ],
         "escalations": [
             deepcopy(escalation)
@@ -291,6 +335,48 @@ def get_medical_results(
     }
 
 
+def book_appointment(
+    slot_id: str,
+    patient_reference: str | None = None,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    slot = next((slot for slot in DEMO_STATE["calendar_slots"] if slot.get("id") == slot_id), None)
+    if not slot:
+        return {
+            "disclaimer": DISCLAIMER,
+            "error": f"Appointment slot not found: {slot_id}",
+        }
+    if slot.get("status") != "available":
+        return {
+            "disclaimer": DISCLAIMER,
+            "error": f"Appointment slot is not available: {slot_id}",
+            "slot": deepcopy(slot),
+        }
+
+    appointment_id = "APT-" + uuid.uuid4().hex[:8].upper()
+    slot["status"] = "booked"
+    record = {
+        "id": appointment_id,
+        "appointment_id": appointment_id,
+        "slot_id": slot_id,
+        "patient_reference": patient_reference or "not linked",
+        "specialty": slot.get("specialty"),
+        "doctor": slot.get("doctor"),
+        "time": slot.get("time"),
+        "mode": slot.get("mode"),
+        "reason": reason or "not specified",
+        "status": "booked",
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+    DEMO_STATE["appointments"].append(record)
+    return {
+        "disclaimer": DISCLAIMER,
+        "appointment": deepcopy(record),
+        "updated_slot": deepcopy(slot),
+        "next_step": "Tell the user the fake appointment has been recorded in the demo system.",
+    }
+
+
 def escalate_to_person(
     reason: str,
     urgency: str = "routine",
@@ -349,6 +435,8 @@ def call_tool(name: str, arguments: dict[str, Any], patient_reference: str | Non
         return get_doctor_calendar(**arguments)
     if name == "get_medical_results":
         return get_medical_results(**arguments)
+    if name == "book_appointment":
+        return book_appointment(**arguments)
     if name == "escalate_to_person":
         return escalate_to_person(**arguments)
     if name == "request_prescription":

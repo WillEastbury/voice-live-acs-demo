@@ -24,6 +24,7 @@ from .fake_medical_tools import (
     add_calendar_slot,
     add_medical_result,
     add_patient,
+    book_appointment,
     demo_state,
     escalate_to_person,
     get_doctor_calendar,
@@ -34,6 +35,7 @@ from .fake_medical_tools import (
     reset_demo_state,
     update_demo_config,
     update_record,
+    verify_patient_identity,
 )
 from .voice_live_bridge import BrowserVoiceBridge, VoiceLiveBridge
 
@@ -92,7 +94,9 @@ async def routes() -> dict[str, Any]:
         "fakeMedicalApis": [
             "/api/fake/state",
             "/api/fake/patients",
+            "/api/fake/verify-patient",
             "/api/fake/doctor-calendar",
+            "/api/fake/appointments",
             "/api/fake/medical-results",
             "/api/fake/escalate",
             "/api/fake/prescription-request",
@@ -178,6 +182,21 @@ async def fake_add_doctor_calendar_slot(payload: dict[str, Any]) -> dict[str, An
     return add_calendar_slot(payload)
 
 
+@app.post("/api/fake/appointments")
+async def fake_book_appointment(payload: dict[str, Any]) -> dict[str, Any]:
+    slot_id = str(payload.get("slot_id") or "").strip()
+    if not slot_id:
+        raise HTTPException(400, "slot_id is required")
+    result = book_appointment(
+        slot_id=slot_id,
+        patient_reference=payload.get("patient_reference"),
+        reason=payload.get("reason"),
+    )
+    if "error" in result:
+        raise HTTPException(400, result["error"])
+    return result
+
+
 @app.get("/api/fake/patients")
 async def fake_patients() -> dict[str, Any]:
     state = demo_state()
@@ -187,6 +206,18 @@ async def fake_patients() -> dict[str, Any]:
 @app.post("/api/fake/patients")
 async def fake_add_patient(payload: dict[str, Any]) -> dict[str, Any]:
     return add_patient(payload)
+
+
+@app.post("/api/fake/verify-patient")
+async def fake_verify_patient(payload: dict[str, Any]) -> dict[str, Any]:
+    patient = verify_patient_identity(
+        name=str(payload.get("name") or ""),
+        date_of_birth=str(payload.get("date_of_birth") or ""),
+        phone_last4=str(payload.get("phone_last4") or ""),
+    )
+    if not patient:
+        raise HTTPException(404, "No matching fake patient found")
+    return {"disclaimer": DISCLAIMER, "patient": patient}
 
 
 @app.get("/api/fake/patients/{patient_reference}")
@@ -216,6 +247,7 @@ async def fake_escalate(payload: dict[str, Any]) -> dict[str, Any]:
         reason=str(payload.get("reason") or "Requested human callback"),
         urgency=str(payload.get("urgency") or "routine"),
         callback_number=payload.get("callback_number"),
+        patient_reference=payload.get("patient_reference"),
     )
 
 
@@ -229,6 +261,7 @@ async def fake_prescription_request(payload: dict[str, Any]) -> dict[str, Any]:
         dosage=payload.get("dosage"),
         pharmacy=payload.get("pharmacy"),
         reason=payload.get("reason"),
+        patient_reference=payload.get("patient_reference"),
     )
 
 
@@ -239,6 +272,7 @@ async def fake_api_index() -> dict[str, Any]:
         "endpoints": {
             "doctorCalendar": "/api/fake/doctor-calendar?specialty=GP&urgency=soon",
             "addDoctorCalendarSlot": "POST /api/fake/doctor-calendar",
+            "bookAppointment": "POST /api/fake/appointments",
             "medicalResults": "/api/fake/medical-results?result_type=bloods",
             "addMedicalResult": "POST /api/fake/medical-results",
             "escalate": "POST /api/fake/escalate",
@@ -246,6 +280,7 @@ async def fake_api_index() -> dict[str, Any]:
             "state": "/api/fake/state",
             "reset": "POST /api/fake/reset",
             "patients": "/api/fake/patients",
+            "verifyPatient": "POST /api/fake/verify-patient",
         },
     }
 

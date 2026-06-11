@@ -38,11 +38,12 @@ This is useful for demos where you want to reveal changing application state to 
 
 ### Fake medical tools
 
-Voice Live receives four callable function tools in `session.update`:
+Voice Live receives five callable function tools in `session.update`:
 
 | Tool | Purpose |
 |---|---|
 | `get_doctor_calendar` | Returns fake appointment slots by specialty/date/urgency. |
+| `book_appointment` | Books a fake appointment into the in-memory fake system and marks the chosen slot booked. |
 | `get_medical_results` | Returns fake test results such as bloods, cholesterol, or X-ray. |
 | `escalate_to_person` | Creates a fake human callback/escalation ticket. |
 | `request_prescription` | Creates a fake prescription request queued for clinician review. |
@@ -96,12 +97,13 @@ The app is deployed to the existing AKS cluster and existing nginx ingress/LB:
 
 The image was built by a one-shot Kubernetes build job on the existing ARM64 AKS nodes and pushed to the existing `tileforgeacr` registry. No new load balancer or persistent compute was created.
 
-The browser voice chat includes a custom greeting box, patient selector, and live context editor. Each browser voice session randomly chooses an en-GB Azure voice and personalizes the greeting with the linked synthetic patient's name. The greeting is spoken when the session starts and can be replayed during the call. Greeting and context can be saved into the in-memory demo configuration. Apply context before or during a voice session to update the Voice Live instructions, or inject the same context as a simulated tool result for demos.
+The browser voice chat includes a custom greeting box, patient identity fields, and live context editor. Demo users identify with name, date of birth, and the last four digits of their registered fake phone number. Each browser voice session randomly chooses an en-GB Azure voice and personalizes the greeting with the linked synthetic patient's name. The greeting is spoken when the session starts and can be replayed during the call. Greeting and context can be saved into the in-memory demo configuration. Apply context before or during a voice session to update the Voice Live instructions, or inject the same context as a simulated tool result for demos.
 
 The main `/voice` page is a merged tabbed console with **Voice chat** and **Fake systems** tabs. The standalone tabbed fake systems GUI remains available at `/systems` and lets a presenter shape the demo live:
 
-- Add synthetic patients that can be selected and linked in the voice session.
+- Add synthetic patients that can be verified and linked in the voice session.
 - Add doctor calendar slots that the `get_doctor_calendar` tool can return.
+- Show booked appointments created by the `book_appointment` tool or the control panel.
 - Add synthetic medical results that the `get_medical_results` tool can return.
 - Create fake escalation callback tickets.
 - Create fake prescription requests.
@@ -221,7 +223,9 @@ kubectl -n voice-live-demo create secret generic voice-live-acs-demo-env \
 | `/api/fake` | Index of fake medical APIs. |
 | `/api/fake/state` | Current in-memory fake system state. |
 | `/api/fake/reset` | Reset fake system state to defaults. |
+| `/api/fake/verify-patient` | Verify fake user identity by name, DOB, and phone last-4. |
 | `/api/fake/doctor-calendar` | Fake doctor calendar lookup. |
+| `/api/fake/appointments` | Fake appointment booking API. |
 | `/api/fake/medical-results` | Fake medical results lookup. |
 | `/api/fake/escalate` | Fake human escalation callback request. |
 | `/api/fake/prescription-request` | Fake prescription request. |

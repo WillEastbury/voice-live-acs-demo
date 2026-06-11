@@ -42,6 +42,7 @@
 
   <nav class="tabs" aria-label="Fake system tabs">
     <button class="tab active" data-tab="calendar">Doctor calendar</button>
+    <button class="tab" data-tab="appointments">Appointments</button>
     <button class="tab" data-tab="patients">Patients</button>
     <button class="tab" data-tab="results">Medical results</button>
     <button class="tab" data-tab="escalations">Escalations</button>
@@ -64,6 +65,18 @@
       <table id="slotsTable"></table>
   </section>
 
+  <section class="card tab-panel" id="tab-appointments">
+      <h2>Booked appointments</h2>
+      <p class="muted">Appointments booked by the agent or this control panel are recorded here.</p>
+      <div class="row">
+        <select id="bookingSlot"></select>
+        <select id="bookingPatient"></select>
+      </div>
+      <input id="bookingReason" placeholder="Booking reason" value="Demo appointment request">
+      <p><button id="bookAppointment">Book selected slot</button></p>
+      <table id="appointmentsTable"></table>
+  </section>
+
   <section class="card tab-panel" id="tab-patients">
       <h2>Patients</h2>
       <p class="muted">Create synthetic users that can be selected in the voice demo and used to scope tool calls.</p>
@@ -73,7 +86,11 @@
       </div>
       <div class="row">
         <input id="patientDob" placeholder="Date of birth" value="1988-06-20">
+        <input id="patientPhoneLast4" placeholder="Registered phone last 4" value="4004">
+      </div>
+      <div class="row">
         <input id="patientNhs" placeholder="Demo NHS/reference number" value="DEMO-0004">
+        <input id="patientVerifyHint" placeholder="Voice login hint" value="Name + DOB + phone last 4">
       </div>
       <textarea id="patientNotes">Demo patient created from the fake systems GUI.</textarea>
       <button id="addPatient">Add patient</button>
@@ -180,13 +197,33 @@ async function refresh() {
   document.getElementById('patientViewSelect').innerHTML = state.patients.map(patient =>
     `<option value="${cell(patient.id)}">${cell(patient.name)} (${cell(patient.id)})</option>`
   ).join('');
-  table('patientsTable', ['id', 'name', 'date_of_birth', 'nhs_number', 'notes'], state.patients);
+  document.getElementById('bookingPatient').innerHTML = state.patients.map(patient =>
+    `<option value="${cell(patient.id)}">${cell(patient.name)} (${cell(patient.id)})</option>`
+  ).join('');
+  document.getElementById('bookingSlot').innerHTML = state.calendar_slots
+    .filter(slot => slot.status === 'available')
+    .map(slot => `<option value="${cell(slot.id)}">${cell(slot.specialty)} · ${cell(slot.doctor)} · ${cell(slot.time)} (${cell(slot.id)})</option>`)
+    .join('');
+  table('patientsTable', ['id', 'name', 'date_of_birth', 'phone_last4', 'nhs_number', 'notes'], state.patients);
   table('slotsTable', ['id', 'specialty', 'doctor', 'time', 'mode', 'urgency', 'status'], state.calendar_slots);
+  table('appointmentsTable', ['appointment_id', 'patient_reference', 'specialty', 'doctor', 'time', 'mode', 'reason', 'status', 'created_at'], state.appointments);
   table('resultsTable', ['id', 'patient_reference', 'result_type', 'name', 'value', 'status'], state.medical_results);
   table('escalationsTable', ['ticket_id', 'reason', 'urgency', 'callback_number', 'created_at'], state.escalations);
   table('prescriptionsTable', ['request_id', 'medication', 'dosage', 'pharmacy', 'reason', 'status'], state.prescription_requests);
   document.getElementById('rawState').textContent = JSON.stringify(state, null, 2);
-  setStatus(`Loaded ${state.patients.length} patients, ${state.calendar_slots.length} slots, ${state.medical_results.length} results, ${state.escalations.length} escalations, ${state.prescription_requests.length} prescription requests.`);
+  setStatus(`Loaded ${state.patients.length} patients, ${state.calendar_slots.length} slots, ${state.appointments.length} appointments, ${state.medical_results.length} results, ${state.escalations.length} escalations, ${state.prescription_requests.length} prescription requests.`);
+}
+
+async function bookAppointment() {
+  await api('/api/fake/appointments', {
+    method: 'POST',
+    body: JSON.stringify({
+      slot_id: document.getElementById('bookingSlot').value,
+      patient_reference: document.getElementById('bookingPatient').value,
+      reason: document.getElementById('bookingReason').value,
+    }),
+  });
+  await refresh();
 }
 
 async function loadPatientView() {
@@ -194,10 +231,12 @@ async function loadPatientView() {
   const view = await api(`/api/fake/patients/${encodeURIComponent(patientId)}`);
   document.getElementById('patientView').innerHTML = `
     <h4>${cell(view.patient.name)} <span class="muted">(${cell(view.patient.id)})</span></h4>
-    <p><strong>DOB:</strong> ${cell(view.patient.date_of_birth)} · <strong>Reference:</strong> ${cell(view.patient.nhs_number)}</p>
+    <p><strong>DOB:</strong> ${cell(view.patient.date_of_birth)} · <strong>Phone last 4:</strong> ${cell(view.patient.phone_last4)} · <strong>Reference:</strong> ${cell(view.patient.nhs_number)}</p>
     <p>${cell(view.patient.notes)}</p>
     <h4>Medical results</h4>
     ${inlineTable(['id', 'result_type', 'name', 'value', 'status'], view.medical_results)}
+    <h4>Appointments</h4>
+    ${inlineTable(['appointment_id', 'specialty', 'doctor', 'time', 'mode', 'reason', 'status'], view.appointments)}
     <h4>Escalations</h4>
     ${inlineTable(['ticket_id', 'reason', 'urgency', 'callback_number', 'created_at'], view.escalations)}
     <h4>Prescription requests</h4>
@@ -212,6 +251,7 @@ async function addPatient() {
       id: document.getElementById('patientId').value,
       name: document.getElementById('patientName').value,
       date_of_birth: document.getElementById('patientDob').value,
+      phone_last4: document.getElementById('patientPhoneLast4').value,
       nhs_number: document.getElementById('patientNhs').value,
       notes: document.getElementById('patientNotes').value,
     }),
@@ -280,6 +320,7 @@ async function reset() {
 
 document.getElementById('refresh').addEventListener('click', () => refresh().catch(err => setStatus(err.message)));
 document.getElementById('reset').addEventListener('click', () => reset().catch(err => setStatus(err.message)));
+document.getElementById('bookAppointment').addEventListener('click', () => bookAppointment().catch(err => setStatus(err.message)));
 document.getElementById('addPatient').addEventListener('click', () => addPatient().catch(err => setStatus(err.message)));
 document.getElementById('loadPatientView').addEventListener('click', () => loadPatientView().catch(err => setStatus(err.message)));
 document.getElementById('addSlot').addEventListener('click', () => addSlot().catch(err => setStatus(err.message)));
