@@ -90,11 +90,22 @@ The app is deployed to the existing AKS cluster and existing nginx ingress/LB:
 | ACS incoming webhook | `https://voice-live-acs.demos.wavefunctionlabs.com/api/incoming-call` |
 | ACS media WebSocket | `wss://voice-live-acs.demos.wavefunctionlabs.com/ws/acs-media` |
 | Browser voice chat | `https://voice-live-acs.demos.wavefunctionlabs.com/voice` |
+| Fake systems GUI | `https://voice-live-acs.demos.wavefunctionlabs.com/systems` |
 | Fake API index | `https://voice-live-acs.demos.wavefunctionlabs.com/api/fake` |
 
 The image was built by a one-shot Kubernetes build job on the existing ARM64 AKS nodes and pushed to the existing `tileforgeacr` registry. No new load balancer or persistent compute was created.
 
 The browser voice chat includes a custom greeting box and a live context editor. The greeting is spoken when the session starts and can be replayed during the call. Apply context before or during a voice session to update the Voice Live instructions, or inject the same context as a simulated tool result for demos.
+
+The fake systems GUI at `/systems` lets a presenter shape the demo live:
+
+- Add doctor calendar slots that the `get_doctor_calendar` tool can return.
+- Add synthetic medical results that the `get_medical_results` tool can return.
+- Create fake escalation callback tickets.
+- Create fake prescription requests.
+- Reset the in-memory demo state back to defaults.
+
+The state is intentionally in-memory and demo-only. It is shared by the browser GUI, REST APIs, and Voice Live tools while the pod is running.
 
 ## Configuration
 
@@ -196,12 +207,15 @@ kubectl -n voice-live-demo create secret generic voice-live-acs-demo-env \
 | `/` | JSON metadata showing configured callback/WebSocket URLs. |
 | `/healthz` | Health probe. |
 | `/voice` | Browser voice chat UI. |
+| `/systems` | Fake healthcare systems control panel. |
 | `/ws/browser-voice` | Browser voice WebSocket. |
 | `/api/incoming-call` | ACS incoming call Event Grid webhook. |
 | `/api/callbacks` | ACS Call Automation callback endpoint. |
 | `/ws/acs-media` | ACS bidirectional media WebSocket. |
 | `/api/calls/outbound/{target}` | Optional outbound PSTN call endpoint, requires `ACS_PHONE_NUMBER`. |
 | `/api/fake` | Index of fake medical APIs. |
+| `/api/fake/state` | Current in-memory fake system state. |
+| `/api/fake/reset` | Reset fake system state to defaults. |
 | `/api/fake/doctor-calendar` | Fake doctor calendar lookup. |
 | `/api/fake/medical-results` | Fake medical results lookup. |
 | `/api/fake/escalate` | Fake human escalation callback request. |

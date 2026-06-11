@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fake healthcare systems</title>
+  <style>
+    body { color: #f4f7fb; background: #111827; font-family: system-ui, sans-serif; margin: 0; }
+    main { max-width: 1180px; margin: 0 auto; padding: 32px 20px; }
+    a { color: #93c5fd; }
+    button, input, select, textarea { border-radius: 10px; border: 1px solid #334155; font: inherit; padding: 10px 12px; }
+    button { background: #2563eb; color: white; cursor: pointer; }
+    button.secondary { background: #475569; }
+    input, select, textarea { background: #0f172a; color: #f8fafc; width: 100%; box-sizing: border-box; }
+    textarea { min-height: 74px; }
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
+    .card { background: #1f2937; border: 1px solid #334155; border-radius: 18px; padding: 18px; }
+    .row { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 10px 0; }
+    .row3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .muted { color: #94a3b8; }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+    th, td { border-bottom: 1px solid #334155; padding: 8px; text-align: left; vertical-align: top; }
+    th { color: #cbd5e1; }
+    code { background: #020617; border-radius: 6px; padding: 2px 6px; }
+    #status { background: #020617; border-radius: 12px; margin: 16px 0; padding: 12px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Fake healthcare systems control panel</h1>
+  <p class="muted">Shape synthetic demo data while the Voice Live agent is running. Nothing here is real clinical data or persisted beyond the app process.</p>
+  <p><a href="/voice">Open voice demo</a> · <a href="/api/fake">Fake API index</a></p>
+  <div class="row">
+    <button id="refresh">Refresh state</button>
+    <button id="reset" class="secondary">Reset demo data</button>
+  </div>
+  <div id="status">Loading...</div>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Doctor calendar</h2>
+      <div class="row">
+        <input id="slotSpecialty" placeholder="Specialty" value="GP">
+        <input id="slotDoctor" placeholder="Doctor" value="Dr Demo">
+      </div>
+      <div class="row row3">
+        <input id="slotTime" placeholder="Time" value="Tomorrow 10:00">
+        <select id="slotMode"><option>phone</option><option>video</option><option>clinic</option></select>
+        <select id="slotUrgency"><option>routine</option><option>soon</option><option>urgent</option></select>
+      </div>
+      <button id="addSlot">Add slot</button>
+      <table id="slotsTable"></table>
+    </div>
+
+    <div class="card">
+      <h2>Medical results</h2>
+      <div class="row">
+        <input id="resultPatient" placeholder="Patient reference" value="demo-patient">
+        <input id="resultType" placeholder="Result type" value="bloods">
+      </div>
+      <div class="row">
+        <input id="resultName" placeholder="Name" value="CRP">
+        <input id="resultValue" placeholder="Value" value="3 mg/L">
+      </div>
+      <input id="resultStatus" placeholder="Status" value="within demo range">
+      <p><button id="addResult">Add result</button></p>
+      <table id="resultsTable"></table>
+    </div>
+
+    <div class="card">
+      <h2>Escalation callback</h2>
+      <textarea id="escalationReason">Patient wants to speak to a nurse about demo symptoms.</textarea>
+      <div class="row">
+        <select id="escalationUrgency"><option>routine</option><option>soon</option><option>urgent</option></select>
+        <input id="callbackNumber" placeholder="Callback number">
+      </div>
+      <button id="addEscalation">Create escalation</button>
+      <table id="escalationsTable"></table>
+    </div>
+
+    <div class="card">
+      <h2>Prescription requests</h2>
+      <div class="row">
+        <input id="rxMedication" placeholder="Medication" value="demo inhaler">
+        <input id="rxDosage" placeholder="Dosage" value="as directed">
+      </div>
+      <input id="rxPharmacy" placeholder="Pharmacy" value="Demo Pharmacy">
+      <textarea id="rxReason">Repeat prescription demo request.</textarea>
+      <button id="addPrescription">Create request</button>
+      <table id="prescriptionsTable"></table>
+    </div>
+  </section>
+</main>
+<script>
+const statusEl = document.getElementById('status');
+let state = {};
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    headers: { 'content-type': 'application/json' },
+    ...options,
+  });
+  if (!response.ok) throw new Error(`${response.status} ${await response.text()}`);
+  return response.json();
+}
+
+function setStatus(message) {
+  statusEl.textContent = message;
+}
+
+function cell(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[char]));
+}
+
+function table(id, headers, rows) {
+  const el = document.getElementById(id);
+  el.innerHTML = `<tr>${headers.map(h => `<th>${cell(h)}</th>`).join('')}</tr>` +
+    rows.map(row => `<tr>${headers.map(h => `<td>${cell(row[h])}</td>`).join('')}</tr>`).join('');
+}
+
+async function refresh() {
+  state = await api('/api/fake/state');
+  table('slotsTable', ['id', 'specialty', 'doctor', 'time', 'mode', 'urgency', 'status'], state.calendar_slots);
+  table('resultsTable', ['id', 'patient_reference', 'result_type', 'name', 'value', 'status'], state.medical_results);
+  table('escalationsTable', ['ticket_id', 'reason', 'urgency', 'callback_number', 'created_at'], state.escalations);
+  table('prescriptionsTable', ['request_id', 'medication', 'dosage', 'pharmacy', 'reason', 'status'], state.prescription_requests);
+  setStatus(`Loaded ${state.calendar_slots.length} slots, ${state.medical_results.length} results, ${state.escalations.length} escalations, ${state.prescription_requests.length} prescription requests.`);
+}
+
+async function addSlot() {
+  await api('/api/fake/doctor-calendar', {
+    method: 'POST',
+    body: JSON.stringify({
+      specialty: document.getElementById('slotSpecialty').value,
+      doctor: document.getElementById('slotDoctor').value,
+      time: document.getElementById('slotTime').value,
+      mode: document.getElementById('slotMode').value,
+      urgency: document.getElementById('slotUrgency').value,
+      status: 'available',
+    }),
+  });
+  await refresh();
+}
+
+async function addResult() {
+  await api('/api/fake/medical-results', {
+    method: 'POST',
+    body: JSON.stringify({
+      patient_reference: document.getElementById('resultPatient').value,
+      result_type: document.getElementById('resultType').value,
+      name: document.getElementById('resultName').value,
+      value: document.getElementById('resultValue').value,
+      status: document.getElementById('resultStatus').value,
+    }),
+  });
+  await refresh();
+}
+
+async function addEscalation() {
+  await api('/api/fake/escalate', {
+    method: 'POST',
+    body: JSON.stringify({
+      reason: document.getElementById('escalationReason').value,
+      urgency: document.getElementById('escalationUrgency').value,
+      callback_number: document.getElementById('callbackNumber').value,
+    }),
+  });
+  await refresh();
+}
+
+async function addPrescription() {
+  await api('/api/fake/prescription-request', {
+    method: 'POST',
+    body: JSON.stringify({
+      medication: document.getElementById('rxMedication').value,
+      dosage: document.getElementById('rxDosage').value,
+      pharmacy: document.getElementById('rxPharmacy').value,
+      reason: document.getElementById('rxReason').value,
+    }),
+  });
+  await refresh();
+}
+
+async function reset() {
+  await api('/api/fake/reset', { method: 'POST' });
+  await refresh();
+}
+
+document.getElementById('refresh').addEventListener('click', () => refresh().catch(err => setStatus(err.message)));
+document.getElementById('reset').addEventListener('click', () => reset().catch(err => setStatus(err.message)));
+document.getElementById('addSlot').addEventListener('click', () => addSlot().catch(err => setStatus(err.message)));
+document.getElementById('addResult').addEventListener('click', () => addResult().catch(err => setStatus(err.message)));
+document.getElementById('addEscalation').addEventListener('click', () => addEscalation().catch(err => setStatus(err.message)));
+document.getElementById('addPrescription').addEventListener('click', () => addPrescription().catch(err => setStatus(err.message)));
+refresh().catch(err => setStatus(err.message));
+</script>
+</body>
+</html>

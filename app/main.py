@@ -21,10 +21,15 @@ from fastapi.responses import FileResponse
 from .config import Settings, get_settings
 from .fake_medical_tools import (
     DISCLAIMER,
+    add_calendar_slot,
+    add_medical_result,
+    demo_state,
     escalate_to_person,
     get_doctor_calendar,
     get_medical_results,
     request_prescription,
+    reset_demo_state,
+    update_record,
 )
 from .voice_live_bridge import BrowserVoiceBridge, VoiceLiveBridge
 
@@ -68,7 +73,9 @@ async def root() -> dict[str, Any]:
         "callbackUrl": settings.callback_url,
         "mediaWebSocket": settings.media_websocket_url,
         "webVoiceUrl": f"{settings.public_host.rstrip('/')}/voice",
+        "fakeSystemsUrl": f"{settings.public_host.rstrip('/')}/systems",
         "fakeMedicalApis": [
+            "/api/fake/state",
             "/api/fake/doctor-calendar",
             "/api/fake/medical-results",
             "/api/fake/escalate",
@@ -82,6 +89,11 @@ async def root() -> dict[str, Any]:
 @app.get("/voice")
 async def voice_page() -> FileResponse:
     return FileResponse(Path(__file__).resolve().parent.parent / "static" / "index.html")
+
+
+@app.get("/systems")
+async def systems_page() -> FileResponse:
+    return FileResponse(Path(__file__).resolve().parent.parent / "static" / "systems.html")
 
 
 @app.get("/healthz")
@@ -150,12 +162,22 @@ async def fake_doctor_calendar(
     return get_doctor_calendar(specialty, preferred_date, urgency)
 
 
+@app.post("/api/fake/doctor-calendar")
+async def fake_add_doctor_calendar_slot(payload: dict[str, Any]) -> dict[str, Any]:
+    return add_calendar_slot(payload)
+
+
 @app.get("/api/fake/medical-results")
 async def fake_medical_results(
     result_type: str = "bloods",
     patient_reference: str | None = None,
 ) -> dict[str, Any]:
     return get_medical_results(result_type, patient_reference)
+
+
+@app.post("/api/fake/medical-results")
+async def fake_add_medical_result(payload: dict[str, Any]) -> dict[str, Any]:
+    return add_medical_result(payload)
 
 
 @app.post("/api/fake/escalate")
@@ -186,11 +208,33 @@ async def fake_api_index() -> dict[str, Any]:
         "disclaimer": DISCLAIMER,
         "endpoints": {
             "doctorCalendar": "/api/fake/doctor-calendar?specialty=GP&urgency=soon",
+            "addDoctorCalendarSlot": "POST /api/fake/doctor-calendar",
             "medicalResults": "/api/fake/medical-results?result_type=bloods",
+            "addMedicalResult": "POST /api/fake/medical-results",
             "escalate": "POST /api/fake/escalate",
             "prescriptionRequest": "POST /api/fake/prescription-request",
+            "state": "/api/fake/state",
+            "reset": "POST /api/fake/reset",
         },
     }
+
+
+@app.get("/api/fake/state")
+async def fake_state() -> dict[str, Any]:
+    return demo_state()
+
+
+@app.post("/api/fake/reset")
+async def fake_reset() -> dict[str, Any]:
+    return reset_demo_state()
+
+
+@app.patch("/api/fake/{collection}/{record_id}")
+async def fake_update_record(collection: str, record_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    result = update_record(collection, record_id, payload)
+    if "error" in result:
+        raise HTTPException(404, result["error"])
+    return result
 
 
 @app.websocket("/ws/acs-media")
