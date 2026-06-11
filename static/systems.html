@@ -85,8 +85,24 @@
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
     .card { background: rgba(15, 23, 42, 0.7); border: 1px solid var(--line); border-radius: 24px; padding: 20px; }
+    .panel-head { align-items: start; display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) auto; margin-bottom: 18px; }
+    .panel-head h2 { margin: 0 0 6px; }
+    .panel-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .section-grid { display: grid; gap: 16px; grid-template-columns: 0.9fr 1.1fr; }
+    .section-grid.wide-first { grid-template-columns: 1.1fr 0.9fr; }
+    .form-card, .records-card {
+      background: rgba(2, 6, 23, 0.24);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 20px;
+      padding: 16px;
+    }
+    .form-card h3, .records-card h3 { font-size: 1rem; margin: 0 0 10px; }
+    .form-card > p, .records-card > p { margin-top: 0; }
     .row { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 12px 0; }
     .row3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .field { display: grid; gap: 6px; }
+    .field span { color: #cfe4f8; font-size: .75rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+    .full { grid-column: 1 / -1; }
     .muted { color: var(--muted); line-height: 1.65; }
     table {
       background: rgba(2, 6, 23, 0.28);
@@ -102,15 +118,23 @@
     th, td { border-bottom: 1px solid rgba(148, 163, 184, 0.16); padding: 11px 12px; text-align: left; vertical-align: top; white-space: nowrap; }
     th { background: rgba(15, 23, 42, 0.92); color: #cfe4f8; font-size: .76rem; letter-spacing: .08em; position: sticky; text-transform: uppercase; top: 0; }
     tr:last-child td { border-bottom: 0; }
+    .empty-row td { color: var(--muted); font-style: italic; text-align: center; }
     code, pre { background: #020617; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 14px; }
     pre { overflow: auto; padding: 16px; }
     #status { background: rgba(2, 6, 23, 0.52); border: 1px solid var(--line); border-radius: 18px; color: #c8d9ec; margin: 16px 0; padding: 14px; white-space: pre-wrap; }
-    #patientView { background: rgba(2, 6, 23, 0.25); border: 1px solid var(--line); border-radius: 20px; margin: 14px 0; padding: 0 16px 12px; }
-    .panel-refresh { float: right; }
+    #patientView { margin-top: 14px; }
+    .patient-card { background: rgba(2, 6, 23, 0.28); border: 1px solid var(--line); border-radius: 20px; padding: 16px; }
+    .patient-title { align-items: baseline; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; }
+    .patient-title h4 { font-size: 1.25rem; margin: 0; }
+    .patient-meta { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 14px 0; }
+    .meta-tile { background: rgba(15, 23, 42, 0.62); border: 1px solid rgba(148, 163, 184, 0.14); border-radius: 14px; padding: 10px; }
+    .meta-tile span { color: var(--muted); display: block; font-size: .74rem; font-weight: 850; text-transform: uppercase; }
+    .meta-tile strong { display: block; margin-top: 3px; }
+    .linked-section { margin-top: 18px; }
     @media (max-width: 880px) {
-      .topbar, .stats, .row, .row3 { grid-template-columns: 1fr; }
+      .topbar, .stats, .row, .row3, .panel-head, .section-grid, .section-grid.wide-first, .patient-meta { grid-template-columns: 1fr; }
       .actions { justify-content: stretch; }
-      .actions button { width: 100%; }
+      .actions button, .panel-actions button { width: 100%; }
     }
   </style>
 </head>
@@ -148,122 +172,216 @@
   </nav>
 
   <section class="card tab-panel active" id="tab-calendar">
-      <button class="secondary panel-refresh">Refresh calendar</button>
-      <h2>Doctor calendar</h2>
-      <div class="row">
-        <input id="slotSpecialty" placeholder="Specialty" value="GP">
-        <input id="slotDoctor" placeholder="Doctor" value="Dr Demo">
+    <div class="panel-head">
+      <div>
+        <h2>Doctor calendar</h2>
+        <p class="muted">Create appointment availability for the agent to offer after patient authentication.</p>
       </div>
-      <div class="row row3">
-        <input id="slotTime" placeholder="Time" value="Tomorrow 10:00">
-        <select id="slotMode"><option>phone</option><option>video</option><option>clinic</option></select>
-        <select id="slotUrgency"><option>routine</option><option>soon</option><option>urgent</option></select>
+      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+    </div>
+    <div class="section-grid">
+      <div class="form-card">
+        <h3>Add availability</h3>
+        <div class="row">
+          <label class="field"><span>Specialty</span><input id="slotSpecialty" value="GP"></label>
+          <label class="field"><span>Clinician</span><input id="slotDoctor" value="Dr Demo"></label>
+        </div>
+        <div class="row row3">
+          <label class="field"><span>Time</span><input id="slotTime" value="Tomorrow 10:00"></label>
+          <label class="field"><span>Mode</span><select id="slotMode"><option>phone</option><option>video</option><option>clinic</option></select></label>
+          <label class="field"><span>Urgency</span><select id="slotUrgency"><option>routine</option><option>soon</option><option>urgent</option></select></label>
+        </div>
+        <button id="addSlot">Add slot</button>
       </div>
-      <button id="addSlot">Add slot</button>
-      <table id="slotsTable"></table>
+      <div class="records-card">
+        <h3>Calendar slots</h3>
+        <table id="slotsTable"></table>
+      </div>
+    </div>
   </section>
 
   <section class="card tab-panel" id="tab-medications">
-      <button class="secondary panel-refresh">Refresh current prescriptions</button>
-      <h2>Current prescriptions</h2>
-      <p class="muted">Medicines already on a patient's demo record and available for repeat prescription requests.</p>
-      <div class="row">
-        <select id="currentRxPatient"></select>
-        <input id="currentRxMedication" placeholder="Medication" value="Demo repeat medicine">
+    <div class="panel-head">
+      <div>
+        <h2>Current prescriptions</h2>
+        <p class="muted">Medicines already on a patient's demo record and available for repeat prescription requests.</p>
       </div>
-      <div class="row">
-        <input id="currentRxDosage" placeholder="Dosage" value="One daily">
-        <input id="currentRxPharmacy" placeholder="Pharmacy" value="Demo Pharmacy">
+      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+    </div>
+    <div class="section-grid">
+      <div class="form-card">
+        <h3>Add current medication</h3>
+        <div class="row">
+          <label class="field"><span>Patient</span><select id="currentRxPatient"></select></label>
+          <label class="field"><span>Medication</span><input id="currentRxMedication" value="Demo repeat medicine"></label>
+        </div>
+        <div class="row">
+          <label class="field"><span>Dosage</span><input id="currentRxDosage" value="One daily"></label>
+          <label class="field"><span>Pharmacy</span><input id="currentRxPharmacy" value="Demo Pharmacy"></label>
+        </div>
+        <button id="addCurrentPrescription">Add current prescription</button>
       </div>
-      <button id="addCurrentPrescription">Add current prescription</button>
-      <table id="currentPrescriptionsTable"></table>
+      <div class="records-card">
+        <h3>Current prescription records</h3>
+        <table id="currentPrescriptionsTable"></table>
+      </div>
+    </div>
   </section>
 
   <section class="card tab-panel" id="tab-appointments">
-      <button class="secondary panel-refresh">Refresh appointments</button>
-      <h2>Booked appointments</h2>
-      <p class="muted">Appointments booked by the agent or this control panel are recorded here.</p>
-      <div class="row">
-        <select id="bookingSlot"></select>
-        <select id="bookingPatient"></select>
+    <div class="panel-head">
+      <div>
+        <h2>Booked appointments</h2>
+        <p class="muted">Appointments booked by the agent or this control panel are recorded here.</p>
       </div>
-      <input id="bookingReason" placeholder="Booking reason" value="Demo appointment request">
-      <p><button id="bookAppointment">Book selected slot</button></p>
-      <table id="appointmentsTable"></table>
+      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+    </div>
+    <div class="section-grid">
+      <div class="form-card">
+        <h3>Book a slot manually</h3>
+        <div class="row">
+          <label class="field"><span>Available slot</span><select id="bookingSlot"></select></label>
+          <label class="field"><span>Patient</span><select id="bookingPatient"></select></label>
+        </div>
+        <label class="field"><span>Reason</span><input id="bookingReason" value="Demo appointment request"></label>
+        <p><button id="bookAppointment">Book selected slot</button></p>
+      </div>
+      <div class="records-card">
+        <h3>Appointment records</h3>
+        <table id="appointmentsTable"></table>
+      </div>
+    </div>
   </section>
 
   <section class="card tab-panel" id="tab-patients">
-      <button class="secondary panel-refresh">Refresh patients</button>
-      <h2>Patients</h2>
-      <p class="muted">Create synthetic users that can be selected in the voice demo and used to scope tool calls.</p>
-      <div class="row">
-        <input id="patientId" placeholder="Patient ID" value="pat-demo-new">
-        <input id="patientName" placeholder="Name" value="Jamie Demo">
+    <div class="panel-head">
+      <div>
+        <h2>Patients</h2>
+        <p class="muted">Create synthetic users, inspect their linked record, and choose who the voice demo should authenticate against.</p>
       </div>
-      <div class="row">
-        <input id="patientDob" placeholder="Date of birth" value="1988-06-20">
-        <input id="patientPostcode" placeholder="Postcode" value="N1 1AA">
+      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+    </div>
+    <div class="section-grid wide-first">
+      <div class="form-card">
+        <h3>Add patient</h3>
+        <div class="row">
+          <label class="field"><span>Patient ID</span><input id="patientId" value="pat-demo-new"></label>
+          <label class="field"><span>Name</span><input id="patientName" value="Jamie Demo"></label>
+        </div>
+        <div class="row">
+          <label class="field"><span>Date of birth</span><input id="patientDob" value="1988-06-20"></label>
+          <label class="field"><span>Postcode</span><input id="patientPostcode" value="N1 1AA"></label>
+        </div>
+        <div class="row">
+          <label class="field"><span>Reference number</span><input id="patientNhs" value="DEMO-0004"></label>
+          <label class="field"><span>Voice login hint</span><input id="patientVerifyHint" value="Name + DOB + postcode" readonly></label>
+        </div>
+        <label class="field"><span>Notes</span><textarea id="patientNotes">Demo patient created from the demo systems GUI.</textarea></label>
+        <button id="addPatient">Add patient</button>
       </div>
-      <div class="row">
-        <input id="patientNhs" placeholder="Demo NHS/reference number" value="DEMO-0004">
-        <input id="patientVerifyHint" placeholder="Voice login hint" value="Name + DOB + postcode">
-      </div>
-      <textarea id="patientNotes">Demo patient created from the demo systems GUI.</textarea>
-      <button id="addPatient">Add patient</button>
-      <h3>Patient view</h3>
-      <div class="row">
-        <select id="patientViewSelect"></select>
+      <div class="records-card">
+        <h3>Patient view</h3>
+        <div class="row">
+          <label class="field full"><span>Selected patient</span><select id="patientViewSelect"></select></label>
+        </div>
         <button id="loadPatientView">Load patient view</button>
+        <div id="patientView"></div>
       </div>
-      <div id="patientView"></div>
+    </div>
+    <div class="records-card" style="margin-top:16px">
+      <h3>All patients</h3>
       <table id="patientsTable"></table>
+    </div>
   </section>
 
   <section class="card tab-panel" id="tab-results">
-      <button class="secondary panel-refresh">Refresh results</button>
-      <h2>Medical results</h2>
-      <div class="row">
-        <input id="resultPatient" placeholder="Patient reference" value="demo-patient">
-        <input id="resultType" placeholder="Result type" value="bloods">
+    <div class="panel-head">
+      <div>
+        <h2>Medical results</h2>
+        <p class="muted">Add synthetic results that can be retrieved once the patient is authenticated.</p>
       </div>
-      <div class="row">
-        <input id="resultName" placeholder="Name" value="CRP">
-        <input id="resultValue" placeholder="Value" value="3 mg/L">
+      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+    </div>
+    <div class="section-grid">
+      <div class="form-card">
+        <h3>Add result</h3>
+        <div class="row">
+          <label class="field"><span>Patient reference</span><input id="resultPatient" value="demo-patient"></label>
+          <label class="field"><span>Result type</span><input id="resultType" value="bloods"></label>
+        </div>
+        <div class="row">
+          <label class="field"><span>Name</span><input id="resultName" value="CRP"></label>
+          <label class="field"><span>Value</span><input id="resultValue" value="3 mg/L"></label>
+        </div>
+        <label class="field"><span>Status</span><input id="resultStatus" value="within demo range"></label>
+        <p><button id="addResult">Add result</button></p>
       </div>
-      <input id="resultStatus" placeholder="Status" value="within demo range">
-      <p><button id="addResult">Add result</button></p>
-      <table id="resultsTable"></table>
+      <div class="records-card">
+        <h3>Result records</h3>
+        <table id="resultsTable"></table>
+      </div>
+    </div>
   </section>
 
   <section class="card tab-panel" id="tab-escalations">
-      <button class="secondary panel-refresh">Refresh escalations</button>
-      <h2>Escalation callback</h2>
-      <textarea id="escalationReason">Patient wants to speak to a nurse about demo symptoms.</textarea>
-      <div class="row">
-        <select id="escalationUrgency"><option>routine</option><option>soon</option><option>urgent</option></select>
-        <input id="callbackNumber" placeholder="Callback number">
+    <div class="panel-head">
+      <div>
+        <h2>Escalation callback</h2>
+        <p class="muted">Human handoff records are allowed before authentication and are used when callers seem frustrated.</p>
       </div>
-      <button id="addEscalation">Create escalation</button>
-      <table id="escalationsTable"></table>
+      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+    </div>
+    <div class="section-grid">
+      <div class="form-card">
+        <h3>Create callback</h3>
+        <label class="field"><span>Reason</span><textarea id="escalationReason">Patient wants to speak to a nurse about demo symptoms.</textarea></label>
+        <div class="row">
+          <label class="field"><span>Urgency</span><select id="escalationUrgency"><option>routine</option><option>soon</option><option>urgent</option></select></label>
+          <label class="field"><span>Callback number</span><input id="callbackNumber" placeholder="Optional"></label>
+        </div>
+        <button id="addEscalation">Create escalation</button>
+      </div>
+      <div class="records-card">
+        <h3>Escalation records</h3>
+        <table id="escalationsTable"></table>
+      </div>
+    </div>
   </section>
 
   <section class="card tab-panel" id="tab-prescriptions">
-      <button class="secondary panel-refresh">Refresh prescriptions</button>
-      <h2>Prescription requests</h2>
-      <div class="row">
-        <input id="rxMedication" placeholder="Medication" value="demo inhaler">
-        <input id="rxDosage" placeholder="Dosage" value="as directed">
+    <div class="panel-head">
+      <div>
+        <h2>Prescription requests</h2>
+        <p class="muted">Requests created by the agent or presenter are queued for clinician review in the demo state.</p>
       </div>
-      <input id="rxPharmacy" placeholder="Pharmacy" value="Demo Pharmacy">
-      <textarea id="rxReason">Repeat prescription demo request.</textarea>
-      <button id="addPrescription">Create request</button>
-      <table id="prescriptionsTable"></table>
+      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+    </div>
+    <div class="section-grid">
+      <div class="form-card">
+        <h3>Create request</h3>
+        <div class="row">
+          <label class="field"><span>Medication</span><input id="rxMedication" value="demo inhaler"></label>
+          <label class="field"><span>Dosage</span><input id="rxDosage" value="as directed"></label>
+        </div>
+        <label class="field"><span>Pharmacy</span><input id="rxPharmacy" value="Demo Pharmacy"></label>
+        <label class="field"><span>Reason</span><textarea id="rxReason">Repeat prescription demo request.</textarea></label>
+        <button id="addPrescription">Create request</button>
+      </div>
+      <div class="records-card">
+        <h3>Prescription request records</h3>
+        <table id="prescriptionsTable"></table>
+      </div>
+    </div>
   </section>
 
   <section class="card tab-panel" id="tab-raw">
-    <button class="secondary panel-refresh">Refresh raw state</button>
-    <h2>Raw demo system state</h2>
-    <p class="muted">Useful for showing exactly what the agent tools can see.</p>
+    <div class="panel-head">
+      <div>
+        <h2>Raw demo system state</h2>
+        <p class="muted">Useful for showing exactly what the agent tools can see.</p>
+      </div>
+      <div class="panel-actions"><button class="secondary panel-refresh">Refresh</button></div>
+    </div>
     <pre id="rawState"></pre>
   </section>
   </div>
@@ -307,8 +425,11 @@ function cell(value) {
 
 function table(id, headers, rows) {
   const el = document.getElementById(id);
+  const body = rows.length
+    ? rows.map(row => `<tr>${headers.map(h => `<td>${cell(row[h])}</td>`).join('')}</tr>`).join('')
+    : `<tr class="empty-row"><td colspan="${headers.length}">No records yet.</td></tr>`;
   el.innerHTML = `<tr>${headers.map(h => `<th>${cell(h)}</th>`).join('')}</tr>` +
-    rows.map(row => `<tr>${headers.map(h => `<td>${cell(row[h])}</td>`).join('')}</tr>`).join('');
+    body;
 }
 
 function inlineTable(headers, rows) {
@@ -373,19 +494,23 @@ async function loadPatientView() {
   const patientId = document.getElementById('patientViewSelect').value;
   const view = await api(`/api/demo/patients/${encodeURIComponent(patientId)}`);
   document.getElementById('patientView').innerHTML = `
-    <h4>${cell(view.patient.name)} <span class="muted">(${cell(view.patient.id)})</span></h4>
-    <p><strong>DOB:</strong> ${cell(view.patient.date_of_birth)} · <strong>Postcode:</strong> ${cell(view.patient.postcode)} · <strong>Reference:</strong> ${cell(view.patient.nhs_number)}</p>
-    <p>${cell(view.patient.notes)}</p>
-    <h4>Medical results</h4>
-    ${inlineTable(['id', 'result_type', 'name', 'value', 'status'], view.medical_results)}
-    <h4>Current prescriptions</h4>
-    ${inlineTable(['id', 'medication', 'dosage', 'pharmacy', 'status'], view.current_prescriptions)}
-    <h4>Appointments</h4>
-    ${inlineTable(['appointment_id', 'specialty', 'doctor', 'time', 'mode', 'reason', 'status'], view.appointments)}
-    <h4>Escalations</h4>
-    ${inlineTable(['ticket_id', 'reason', 'urgency', 'callback_number', 'created_at'], view.escalations)}
-    <h4>Prescription requests</h4>
-    ${inlineTable(['request_id', 'medication', 'dosage', 'pharmacy', 'reason', 'status'], view.prescription_requests)}
+    <div class="patient-card">
+      <div class="patient-title">
+        <h4>${cell(view.patient.name)}</h4>
+        <span class="muted">${cell(view.patient.id)}</span>
+      </div>
+      <div class="patient-meta">
+        <div class="meta-tile"><span>Date of birth</span><strong>${cell(view.patient.date_of_birth)}</strong></div>
+        <div class="meta-tile"><span>Postcode</span><strong>${cell(view.patient.postcode)}</strong></div>
+        <div class="meta-tile"><span>Reference</span><strong>${cell(view.patient.nhs_number)}</strong></div>
+      </div>
+      <p class="muted">${cell(view.patient.notes || 'No notes recorded.')}</p>
+      <div class="linked-section"><h4>Medical results</h4>${inlineTable(['id', 'result_type', 'name', 'value', 'status'], view.medical_results)}</div>
+      <div class="linked-section"><h4>Current prescriptions</h4>${inlineTable(['id', 'medication', 'dosage', 'pharmacy', 'status'], view.current_prescriptions)}</div>
+      <div class="linked-section"><h4>Appointments</h4>${inlineTable(['appointment_id', 'specialty', 'doctor', 'time', 'mode', 'reason', 'status'], view.appointments)}</div>
+      <div class="linked-section"><h4>Escalations</h4>${inlineTable(['ticket_id', 'reason', 'urgency', 'callback_number', 'created_at'], view.escalations)}</div>
+      <div class="linked-section"><h4>Prescription requests</h4>${inlineTable(['request_id', 'medication', 'dosage', 'pharmacy', 'reason', 'status'], view.prescription_requests)}</div>
+    </div>
   `;
 }
 
