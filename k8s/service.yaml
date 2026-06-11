@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: voice-live-acs-demo
+  namespace: voice-live-demo
+  labels:
+    app.kubernetes.io/name: voice-live-acs-demo
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: voice-live-acs-demo
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

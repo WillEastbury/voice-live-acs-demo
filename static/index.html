@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voice Live web chat</title>
+  <style>
+    body { color: #f4f7fb; background: #111827; font-family: system-ui, sans-serif; margin: 0; }
+    main { max-width: 760px; margin: 0 auto; padding: 40px 20px; }
+    button, input { border-radius: 10px; border: 1px solid #334155; font: inherit; padding: 12px 16px; }
+    button { background: #2563eb; color: white; cursor: pointer; }
+    button:disabled { background: #475569; cursor: not-allowed; }
+    input { background: #0f172a; color: #f8fafc; width: min(520px, 100%); }
+    .card { background: #1f2937; border: 1px solid #334155; border-radius: 18px; padding: 24px; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+    textarea { background: #0f172a; border: 1px solid #334155; border-radius: 10px; color: #f8fafc; font: inherit; min-height: 120px; padding: 12px; width: 100%; }
+    #log { background: #020617; border-radius: 12px; min-height: 180px; padding: 16px; white-space: pre-wrap; }
+    .muted { color: #94a3b8; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Voice Live web chat</h1>
+  <p class="muted">Browser microphone to Azure Voice Live, no ACS phone number required.</p>
+  <section class="card">
+    <div class="row">
+      <button id="start">Start voice session</button>
+      <button id="stop" disabled>Stop</button>
+    </div>
+    <label for="context">Conversation prompt/context</label>
+    <textarea id="context">Current smart home state:
+- Kitchen lights are off.
+- Living room temperature is 19 C; target is 21 C.
+- Front door is locked.
+- Demo user prefers concise confirmations.
+
+If asked to control devices, act as if these actions are available and confirm the new state.</textarea>
+    <div class="row">
+      <button id="applyContext" disabled>Apply context to live session</button>
+      <button id="fakeTool" disabled>Inject as fake tool result</button>
+    </div>
+    <div class="row">
+      <input id="text" placeholder="Optional typed command, e.g. turn on kitchen lights">
+      <button id="send" disabled>Send text</button>
+    </div>
+    <div id="log">Idle.</div>
+  </section>
+</main>
+<script>
+const TARGET_RATE = 24000;
+let ws, audioContext, source, processor, stream, nextPlaybackTime = 0;
+const logEl = document.getElementById('log');
+const startEl = document.getElementById('start');
+const stopEl = document.getElementById('stop');
+const sendEl = document.getElementById('send');
+const textEl = document.getElementById('text');
+const contextEl = document.getElementById('context');
+const applyContextEl = document.getElementById('applyContext');
+const fakeToolEl = document.getElementById('fakeTool');
+
+function log(line) {
+  logEl.textContent += `\n${new Date().toLocaleTimeString()} ${line}`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function downsampleToPcm16(samples, sourceRate) {
+  const ratio = sourceRate / TARGET_RATE;
+  const length = Math.floor(samples.length / ratio);
+  const pcm = new Int16Array(length);
+  for (let i = 0; i < length; i++) {
+    const start = Math.floor(i * ratio);
+    const end = Math.min(Math.floor((i + 1) * ratio), samples.length);
+    let sum = 0;
+    for (let j = start; j < end; j++) sum += samples[j];
+    const sample = Math.max(-1, Math.min(1, sum / Math.max(1, end - start)));
+    pcm[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+  }
+  return new Uint8Array(pcm.buffer);
+}
+
+function playPcm16(base64Pcm) {
+  const bytes = base64ToBytes(base64Pcm);
+  const pcm = new Int16Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 2));
+  const buffer = audioContext.createBuffer(1, pcm.length, TARGET_RATE);
+  const channel = buffer.getChannelData(0);
+  for (let i = 0; i < pcm.length; i++) channel[i] = pcm[i] / 0x8000;
+
+  const node = audioContext.createBufferSource();
+  node.buffer = buffer;
+  node.connect(audioContext.destination);
+  nextPlaybackTime = Math.max(nextPlaybackTime, audioContext.currentTime + 0.03);
+  node.start(nextPlaybackTime);
+  nextPlaybackTime += buffer.duration;
+}
+
+async function start() {
+  logEl.textContent = 'Starting...';
+  audioContext = new AudioContext({ sampleRate: TARGET_RATE });
+  await audioContext.resume();
+  stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+  });
+
+  ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/browser-voice`);
+  ws.onopen = () => {
+    sendContextUpdate();
+    log('Connected. Speak naturally.');
+  };
+  ws.onclose = () => log('Disconnected.');
+  ws.onerror = () => log('WebSocket error.');
+  ws.onmessage = (event) => {
+    const message = JSON.parse(event.data);
+    if (message.type === 'audio') playPcm16(message.audio);
+    if (message.type === 'transcript_delta') log(`Agent: ${message.text}`);
+    if (message.type === 'event') log(`Event: ${message.event}`);
+    if (message.type === 'error') log(`Error: ${JSON.stringify(message.error)}`);
+  };
+
+  source = audioContext.createMediaStreamSource(stream);
+  processor = audioContext.createScriptProcessor(4096, 1, 1);
+  processor.onaudioprocess = (event) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const pcm = downsampleToPcm16(event.inputBuffer.getChannelData(0), audioContext.sampleRate);
+    ws.send(JSON.stringify({ type: 'input_audio', audio: bytesToBase64(pcm) }));
+  };
+  source.connect(processor);
+  processor.connect(audioContext.destination);
+
+  startEl.disabled = true;
+  stopEl.disabled = false;
+  sendEl.disabled = false;
+  applyContextEl.disabled = false;
+  fakeToolEl.disabled = false;
+}
+
+function stop() {
+  if (processor) processor.disconnect();
+  if (source) source.disconnect();
+  if (stream) stream.getTracks().forEach(track => track.stop());
+  if (ws && ws.readyState <= WebSocket.OPEN) ws.close();
+  if (audioContext) audioContext.close();
+  startEl.disabled = false;
+  stopEl.disabled = true;
+  sendEl.disabled = true;
+  applyContextEl.disabled = true;
+  fakeToolEl.disabled = true;
+}
+
+function sendText() {
+  const text = textEl.value.trim();
+  if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: 'text', text }));
+  log(`You typed: ${text}`);
+  textEl.value = '';
+}
+
+function sendContextUpdate() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: 'context_update', context: contextEl.value }));
+  log('Context applied to session.');
+}
+
+function injectFakeToolResult() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({
+    type: 'fake_tool_result',
+    toolName: 'demo_state_editor',
+    output: contextEl.value
+  }));
+  log('Injected context as simulated tool result.');
+}
+
+startEl.addEventListener('click', () => start().catch(err => log(`Start failed: ${err.message}`)));
+stopEl.addEventListener('click', stop);
+sendEl.addEventListener('click', sendText);
+applyContextEl.addEventListener('click', sendContextUpdate);
+fakeToolEl.addEventListener('click', injectFakeToolResult);
+textEl.addEventListener('keydown', event => {
+  if (event.key === 'Enter') sendText();
+});
+</script>
+</body>
+</html>
