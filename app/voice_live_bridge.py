@@ -11,6 +11,7 @@ from azure.identity.aio import DefaultAzureCredential
 from starlette.websockets import WebSocket
 
 from .config import Settings
+from .fake_medical_tools import TOOL_DEFINITIONS, call_tool_json
 
 logger = logging.getLogger("voice-live-acs-demo.bridge")
 
@@ -21,6 +22,7 @@ class VoiceLiveBridge:
         self.settings = settings
         self.credential: DefaultAzureCredential | None = None
         self.voice_live = None
+        self.completed_tool_calls: set[str] = set()
 
     async def run(self) -> None:
         headers = await self._auth_headers()
@@ -79,6 +81,8 @@ class VoiceLiveBridge:
                         "interrupt_response": True,
                     },
                     "input_audio_noise_reduction": {"type": "azure_deep_noise_suppression"},
+                    "tools": TOOL_DEFINITIONS,
+                    "tool_choice": "auto",
                     "voice": {
                         "name": self.settings.voice_live_voice,
                         "type": "azure-standard",
@@ -127,6 +131,9 @@ class VoiceLiveBridge:
                     await self._send_acs_audio(delta)
                 continue
 
+            if await self._handle_tool_call_event(event):
+                continue
+
             if event_type in {"input_audio_buffer.speech_started", "conversation.interrupted"}:
                 await self._send_acs_stop_audio()
                 continue
@@ -139,6 +146,41 @@ class VoiceLiveBridge:
 
     async def _send_voice_live(self, payload: dict[str, Any]) -> None:
         await self.voice_live.send(json.dumps(payload))
+
+    async def _handle_tool_call_event(self, event: dict[str, Any]) -> bool:
+        event_type = event.get("type", "")
+        call_id = event.get("call_id")
+        name = event.get("name")
+        arguments = event.get("arguments")
+
+        item = event.get("item") or {}
+        if item.get("type") == "function_call":
+            call_id = call_id or item.get("call_id")
+            name = name or item.get("name")
+            arguments = arguments or item.get("arguments")
+
+        if event_type not in {"response.function_call_arguments.done", "response.output_item.done"}:
+            return False
+        if not call_id or not name:
+            return False
+        if call_id in self.completed_tool_calls:
+            return True
+
+        self.completed_tool_calls.add(call_id)
+        output = call_tool_json(name, arguments)
+        logger.info("Voice Live tool call: %s(%s) -> %s", name, arguments, output)
+        await self._send_voice_live(
+            {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "function_call_output",
+                    "call_id": call_id,
+                    "output": output,
+                },
+            }
+        )
+        await self._send_voice_live({"type": "response.create"})
+        return True
 
     async def _send_dtmf_command(self, digit: str) -> None:
         await self._send_voice_live(
@@ -217,6 +259,31 @@ class BrowserVoiceBridge(VoiceLiveBridge):
                 )
                 continue
 
+            if message_type == "greeting":
+                greeting = str(message.get("text") or "").strip()
+                if greeting:
+                    await self._send_voice_live(
+                        {
+                            "type": "conversation.item.create",
+                            "item": {
+                                "type": "message",
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "input_text",
+                                        "text": (
+                                            "Use the following as your opening greeting. "
+                                            "Speak it naturally and do not mention that it came from a control panel: "
+                                            f"{greeting}"
+                                        ),
+                                    }
+                                ],
+                            },
+                        }
+                    )
+                    await self._send_voice_live({"type": "response.create"})
+                continue
+
             if message_type == "fake_tool_result":
                 tool_name = str(message.get("toolName") or "demo_context_lookup").strip()
                 output = str(message.get("output") or "").strip()
@@ -284,6 +351,8 @@ class BrowserVoiceBridge(VoiceLiveBridge):
                         "interrupt_response": True,
                     },
                     "input_audio_noise_reduction": {"type": "azure_deep_noise_suppression"},
+                    "tools": TOOL_DEFINITIONS,
+                    "tool_choice": "auto",
                     "voice": {
                         "name": self.settings.voice_live_voice,
                         "type": "azure-standard",
@@ -303,6 +372,17 @@ class BrowserVoiceBridge(VoiceLiveBridge):
                     await self.acs_websocket.send_text(
                         json.dumps({"type": "audio", "audio": delta})
                     )
+                continue
+
+            if await self._handle_tool_call_event(event):
+                await self.acs_websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "tool_call",
+                            "name": event.get("name") or (event.get("item") or {}).get("name"),
+                        }
+                    )
+                )
                 continue
 
             if event_type.endswith("audio_transcript.delta"):

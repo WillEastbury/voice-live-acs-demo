@@ -7,6 +7,8 @@ This sample demonstrates two ways to run a low-latency Azure Voice Live agent:
 
 The default agent is a voice-control assistant for a fictional smart home. The browser demo includes a live context editor so a presenter can change what the agent knows before or during a session, plus a simulated tool-result injection path for demos.
 
+The deployed sample also includes **demo-only fake healthcare tools** for appointment lookup, medical result lookup, human escalation, and prescription requests. They return synthetic data only and are not connected to any clinical system.
+
 ## How it works
 
 ```text
@@ -33,6 +35,26 @@ The `/voice` page has a **Conversation prompt/context** editor:
 - **Fake tool result**: click **Inject as fake tool result**. The backend inserts a live conversation item that looks like external state from a simulated tool named `demo_state_editor`, then asks Voice Live to respond.
 
 This is useful for demos where you want to reveal changing application state to the agent without building real integrations.
+
+### Fake medical tools
+
+Voice Live receives four callable function tools in `session.update`:
+
+| Tool | Purpose |
+|---|---|
+| `get_doctor_calendar` | Returns fake appointment slots by specialty/date/urgency. |
+| `get_medical_results` | Returns fake test results such as bloods, cholesterol, or X-ray. |
+| `escalate_to_person` | Creates a fake human callback/escalation ticket. |
+| `request_prescription` | Creates a fake prescription request queued for clinician review. |
+
+When Voice Live emits a function-call event, the backend:
+
+1. Parses the function name and JSON arguments.
+2. Calls the matching fake API function in `app/fake_medical_tools.py`.
+3. Sends a `conversation.item.create` event with `type: function_call_output`.
+4. Sends `response.create` so the agent explains the result to the user.
+
+All fake tool responses include a demo disclaimer. The app does not store patient data.
 
 ### ACS telephony path
 
@@ -68,10 +90,11 @@ The app is deployed to the existing AKS cluster and existing nginx ingress/LB:
 | ACS incoming webhook | `https://voice-live-acs.demos.wavefunctionlabs.com/api/incoming-call` |
 | ACS media WebSocket | `wss://voice-live-acs.demos.wavefunctionlabs.com/ws/acs-media` |
 | Browser voice chat | `https://voice-live-acs.demos.wavefunctionlabs.com/voice` |
+| Fake API index | `https://voice-live-acs.demos.wavefunctionlabs.com/api/fake` |
 
 The image was built by a one-shot Kubernetes build job on the existing ARM64 AKS nodes and pushed to the existing `tileforgeacr` registry. No new load balancer or persistent compute was created.
 
-The browser voice chat includes a live context editor. Apply context before or during a voice session to update the Voice Live instructions, or inject the same context as a simulated tool result for demos.
+The browser voice chat includes a custom greeting box and a live context editor. The greeting is spoken when the session starts and can be replayed during the call. Apply context before or during a voice session to update the Voice Live instructions, or inject the same context as a simulated tool result for demos.
 
 ## Configuration
 
@@ -178,6 +201,11 @@ kubectl -n voice-live-demo create secret generic voice-live-acs-demo-env \
 | `/api/callbacks` | ACS Call Automation callback endpoint. |
 | `/ws/acs-media` | ACS bidirectional media WebSocket. |
 | `/api/calls/outbound/{target}` | Optional outbound PSTN call endpoint, requires `ACS_PHONE_NUMBER`. |
+| `/api/fake` | Index of fake medical APIs. |
+| `/api/fake/doctor-calendar` | Fake doctor calendar lookup. |
+| `/api/fake/medical-results` | Fake medical results lookup. |
+| `/api/fake/escalate` | Fake human escalation callback request. |
+| `/api/fake/prescription-request` | Fake prescription request. |
 
 ## Cleanup
 

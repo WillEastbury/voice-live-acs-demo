@@ -27,18 +27,24 @@
       <button id="start">Start voice session</button>
       <button id="stop" disabled>Stop</button>
     </div>
+    <label for="greeting">Custom greeting</label>
+    <textarea id="greeting">Hello, you're through to the demo healthcare assistant. I can help with fake appointment availability, fake test results, callback escalation, and prescription request demos. How can I help?</textarea>
+    <div class="row">
+      <button id="playGreeting" disabled>Play greeting now</button>
+    </div>
     <label for="context">Conversation prompt/context</label>
-    <textarea id="context">Current smart home state:
-- Kitchen lights are off.
-- Living room temperature is 19 C; target is 21 C.
-- Front door is locked.
-- Demo user prefers concise confirmations.
+    <textarea id="context">Demo clinic context:
+- Patient is using fake demo data only.
+- Available departments: GP, cardiology, dermatology, pharmacy.
+- Do not give real medical advice.
+- For urgent or worsening symptoms, advise local urgent care/emergency services.
 
-If asked to control devices, act as if these actions are available and confirm the new state.</textarea>
+If asked to use tools, call the fake healthcare APIs and explain that results are synthetic demo data.</textarea>
     <div class="row">
       <button id="applyContext" disabled>Apply context to live session</button>
       <button id="fakeTool" disabled>Inject as fake tool result</button>
     </div>
+    <p class="muted">Try: “Find me a GP appointment tomorrow”, “Do I have any fake blood results?”, “Ask a person to call me back”, or “Request a repeat prescription for demo inhaler”.</p>
     <div class="row">
       <input id="text" placeholder="Optional typed command, e.g. turn on kitchen lights">
       <button id="send" disabled>Send text</button>
@@ -55,8 +61,10 @@ const stopEl = document.getElementById('stop');
 const sendEl = document.getElementById('send');
 const textEl = document.getElementById('text');
 const contextEl = document.getElementById('context');
+const greetingEl = document.getElementById('greeting');
 const applyContextEl = document.getElementById('applyContext');
 const fakeToolEl = document.getElementById('fakeTool');
+const playGreetingEl = document.getElementById('playGreeting');
 
 function log(line) {
   logEl.textContent += `\n${new Date().toLocaleTimeString()} ${line}`;
@@ -119,6 +127,7 @@ async function start() {
   ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/browser-voice`);
   ws.onopen = () => {
     sendContextUpdate();
+    sendGreeting();
     log('Connected. Speak naturally.');
   };
   ws.onclose = () => log('Disconnected.');
@@ -128,6 +137,7 @@ async function start() {
     if (message.type === 'audio') playPcm16(message.audio);
     if (message.type === 'transcript_delta') log(`Agent: ${message.text}`);
     if (message.type === 'event') log(`Event: ${message.event}`);
+    if (message.type === 'tool_call') log(`Tool called: ${message.name}`);
     if (message.type === 'error') log(`Error: ${JSON.stringify(message.error)}`);
   };
 
@@ -146,6 +156,7 @@ async function start() {
   sendEl.disabled = false;
   applyContextEl.disabled = false;
   fakeToolEl.disabled = false;
+  playGreetingEl.disabled = false;
 }
 
 function stop() {
@@ -159,6 +170,7 @@ function stop() {
   sendEl.disabled = true;
   applyContextEl.disabled = true;
   fakeToolEl.disabled = true;
+  playGreetingEl.disabled = true;
 }
 
 function sendText() {
@@ -185,11 +197,18 @@ function injectFakeToolResult() {
   log('Injected context as simulated tool result.');
 }
 
+function sendGreeting() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: 'greeting', text: greetingEl.value }));
+  log('Greeting sent.');
+}
+
 startEl.addEventListener('click', () => start().catch(err => log(`Start failed: ${err.message}`)));
 stopEl.addEventListener('click', stop);
 sendEl.addEventListener('click', sendText);
 applyContextEl.addEventListener('click', sendContextUpdate);
 fakeToolEl.addEventListener('click', injectFakeToolResult);
+playGreetingEl.addEventListener('click', sendGreeting);
 textEl.addEventListener('keydown', event => {
   if (event.key === 'Enter') sendText();
 });

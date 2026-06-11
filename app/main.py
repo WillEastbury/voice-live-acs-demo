@@ -19,6 +19,13 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.responses import FileResponse
 
 from .config import Settings, get_settings
+from .fake_medical_tools import (
+    DISCLAIMER,
+    escalate_to_person,
+    get_doctor_calendar,
+    get_medical_results,
+    request_prescription,
+)
 from .voice_live_bridge import BrowserVoiceBridge, VoiceLiveBridge
 
 logging.basicConfig(level=logging.INFO)
@@ -61,6 +68,12 @@ async def root() -> dict[str, Any]:
         "callbackUrl": settings.callback_url,
         "mediaWebSocket": settings.media_websocket_url,
         "webVoiceUrl": f"{settings.public_host.rstrip('/')}/voice",
+        "fakeMedicalApis": [
+            "/api/fake/doctor-calendar",
+            "/api/fake/medical-results",
+            "/api/fake/escalate",
+            "/api/fake/prescription-request",
+        ],
         "voiceLiveEndpoint": settings.voice_live_endpoint,
         "voiceLiveModel": settings.voice_live_model,
     }
@@ -126,6 +139,58 @@ async def create_outbound_call(target_phone_number: str) -> dict[str, str | None
         media_streaming=media_streaming_options(),
     )
     return {"callConnectionId": result.call_connection_id}
+
+
+@app.get("/api/fake/doctor-calendar")
+async def fake_doctor_calendar(
+    specialty: str = "GP",
+    preferred_date: str | None = None,
+    urgency: str = "routine",
+) -> dict[str, Any]:
+    return get_doctor_calendar(specialty, preferred_date, urgency)
+
+
+@app.get("/api/fake/medical-results")
+async def fake_medical_results(
+    result_type: str = "bloods",
+    patient_reference: str | None = None,
+) -> dict[str, Any]:
+    return get_medical_results(result_type, patient_reference)
+
+
+@app.post("/api/fake/escalate")
+async def fake_escalate(payload: dict[str, Any]) -> dict[str, Any]:
+    return escalate_to_person(
+        reason=str(payload.get("reason") or "Requested human callback"),
+        urgency=str(payload.get("urgency") or "routine"),
+        callback_number=payload.get("callback_number"),
+    )
+
+
+@app.post("/api/fake/prescription-request")
+async def fake_prescription_request(payload: dict[str, Any]) -> dict[str, Any]:
+    medication = str(payload.get("medication") or "").strip()
+    if not medication:
+        raise HTTPException(400, "medication is required")
+    return request_prescription(
+        medication=medication,
+        dosage=payload.get("dosage"),
+        pharmacy=payload.get("pharmacy"),
+        reason=payload.get("reason"),
+    )
+
+
+@app.get("/api/fake")
+async def fake_api_index() -> dict[str, Any]:
+    return {
+        "disclaimer": DISCLAIMER,
+        "endpoints": {
+            "doctorCalendar": "/api/fake/doctor-calendar?specialty=GP&urgency=soon",
+            "medicalResults": "/api/fake/medical-results?result_type=bloods",
+            "escalate": "POST /api/fake/escalate",
+            "prescriptionRequest": "POST /api/fake/prescription-request",
+        },
+    }
 
 
 @app.websocket("/ws/acs-media")
