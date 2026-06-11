@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.responses import FileResponse
 
 from .config import Settings, get_settings
-from .fake_medical_tools import (
+from .demo_medical_tools import (
     DISCLAIMER,
     add_calendar_slot,
     add_current_prescription,
@@ -91,17 +91,17 @@ async def routes() -> dict[str, Any]:
         "callbackUrl": settings.callback_url,
         "mediaWebSocket": settings.media_websocket_url,
         "webVoiceUrl": f"{settings.public_host.rstrip('/')}/voice",
-        "fakeSystemsUrl": f"{settings.public_host.rstrip('/')}/systems",
-        "fakeMedicalApis": [
-            "/api/fake/state",
-            "/api/fake/patients",
-            "/api/fake/verify-patient",
-            "/api/fake/doctor-calendar",
-            "/api/fake/appointments",
-            "/api/fake/medical-results",
-            "/api/fake/current-prescriptions",
-            "/api/fake/escalate",
-            "/api/fake/prescription-request",
+        "demoSystemsUrl": f"{settings.public_host.rstrip('/')}/systems",
+        "demoMedicalApis": [
+            "/api/demo/state",
+            "/api/demo/patients",
+            "/api/demo/verify-patient",
+            "/api/demo/doctor-calendar",
+            "/api/demo/appointments",
+            "/api/demo/medical-results",
+            "/api/demo/current-prescriptions",
+            "/api/demo/escalate",
+            "/api/demo/prescription-request",
         ],
         "voiceLiveEndpoint": settings.voice_live_endpoint,
         "voiceLiveModel": settings.voice_live_model,
@@ -170,8 +170,8 @@ async def create_outbound_call(target_phone_number: str) -> dict[str, str | None
     return {"callConnectionId": result.call_connection_id}
 
 
-@app.get("/api/fake/doctor-calendar")
-async def fake_doctor_calendar(
+@app.get("/api/demo/doctor-calendar")
+async def demo_doctor_calendar(
     specialty: str = "GP",
     preferred_date: str | None = None,
     urgency: str = "routine",
@@ -179,13 +179,13 @@ async def fake_doctor_calendar(
     return get_doctor_calendar(specialty, preferred_date, urgency)
 
 
-@app.post("/api/fake/doctor-calendar")
-async def fake_add_doctor_calendar_slot(payload: dict[str, Any]) -> dict[str, Any]:
+@app.post("/api/demo/doctor-calendar")
+async def demo_add_doctor_calendar_slot(payload: dict[str, Any]) -> dict[str, Any]:
     return add_calendar_slot(payload)
 
 
-@app.post("/api/fake/appointments")
-async def fake_book_appointment(payload: dict[str, Any]) -> dict[str, Any]:
+@app.post("/api/demo/appointments")
+async def demo_book_appointment(payload: dict[str, Any]) -> dict[str, Any]:
     slot_id = str(payload.get("slot_id") or "").strip()
     if not slot_id:
         raise HTTPException(400, "slot_id is required")
@@ -199,60 +199,60 @@ async def fake_book_appointment(payload: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-@app.get("/api/fake/patients")
-async def fake_patients() -> dict[str, Any]:
+@app.get("/api/demo/patients")
+async def demo_patients() -> dict[str, Any]:
     state = demo_state()
     return {"disclaimer": DISCLAIMER, "patients": state["patients"]}
 
 
-@app.post("/api/fake/patients")
-async def fake_add_patient(payload: dict[str, Any]) -> dict[str, Any]:
+@app.post("/api/demo/patients")
+async def demo_add_patient(payload: dict[str, Any]) -> dict[str, Any]:
     return add_patient(payload)
 
 
-@app.post("/api/fake/verify-patient")
-async def fake_verify_patient(payload: dict[str, Any]) -> dict[str, Any]:
+@app.post("/api/demo/verify-patient")
+async def demo_verify_patient(payload: dict[str, Any]) -> dict[str, Any]:
     patient = verify_patient_identity(
         name=str(payload.get("name") or ""),
         date_of_birth=str(payload.get("date_of_birth") or ""),
         postcode=str(payload.get("postcode") or ""),
     )
     if not patient:
-        raise HTTPException(404, "No matching fake patient found")
+        raise HTTPException(404, "No matching demo patient found")
     return {"disclaimer": DISCLAIMER, "patient": patient}
 
 
-@app.get("/api/fake/patients/{patient_reference}")
-async def fake_patient(patient_reference: str) -> dict[str, Any]:
+@app.get("/api/demo/patients/{patient_reference}")
+async def demo_patient(patient_reference: str) -> dict[str, Any]:
     view = patient_view(patient_reference)
     if not view:
         raise HTTPException(404, "patient not found")
     return view
 
 
-@app.get("/api/fake/medical-results")
-async def fake_medical_results(
+@app.get("/api/demo/medical-results")
+async def demo_medical_results(
     result_type: str = "bloods",
     patient_reference: str | None = None,
 ) -> dict[str, Any]:
     return get_medical_results(result_type, patient_reference)
 
 
-@app.post("/api/fake/medical-results")
-async def fake_add_medical_result(payload: dict[str, Any]) -> dict[str, Any]:
+@app.post("/api/demo/medical-results")
+async def demo_add_medical_result(payload: dict[str, Any]) -> dict[str, Any]:
     return add_medical_result(payload)
 
 
-@app.post("/api/fake/current-prescriptions")
-async def fake_add_current_prescription(payload: dict[str, Any]) -> dict[str, Any]:
+@app.post("/api/demo/current-prescriptions")
+async def demo_add_current_prescription(payload: dict[str, Any]) -> dict[str, Any]:
     medication = str(payload.get("medication") or "").strip()
     if not medication:
         raise HTTPException(400, "medication is required")
     return add_current_prescription(payload)
 
 
-@app.post("/api/fake/escalate")
-async def fake_escalate(payload: dict[str, Any]) -> dict[str, Any]:
+@app.post("/api/demo/escalate")
+async def demo_escalate(payload: dict[str, Any]) -> dict[str, Any]:
     return escalate_to_person(
         reason=str(payload.get("reason") or "Requested human callback"),
         urgency=str(payload.get("urgency") or "routine"),
@@ -261,8 +261,8 @@ async def fake_escalate(payload: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-@app.post("/api/fake/prescription-request")
-async def fake_prescription_request(payload: dict[str, Any]) -> dict[str, Any]:
+@app.post("/api/demo/prescription-request")
+async def demo_prescription_request(payload: dict[str, Any]) -> dict[str, Any]:
     medication = str(payload.get("medication") or "").strip()
     if not medication:
         raise HTTPException(400, "medication is required")
@@ -275,44 +275,44 @@ async def fake_prescription_request(payload: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-@app.get("/api/fake")
-async def fake_api_index() -> dict[str, Any]:
+@app.get("/api/demo")
+async def demo_api_index() -> dict[str, Any]:
     return {
         "disclaimer": DISCLAIMER,
         "endpoints": {
-            "doctorCalendar": "/api/fake/doctor-calendar?specialty=GP&urgency=soon",
-            "addDoctorCalendarSlot": "POST /api/fake/doctor-calendar",
-            "bookAppointment": "POST /api/fake/appointments",
-            "medicalResults": "/api/fake/medical-results?result_type=bloods",
-            "addMedicalResult": "POST /api/fake/medical-results",
-            "addCurrentPrescription": "POST /api/fake/current-prescriptions",
-            "escalate": "POST /api/fake/escalate",
-            "prescriptionRequest": "POST /api/fake/prescription-request",
-            "state": "/api/fake/state",
-            "reset": "POST /api/fake/reset",
-            "patients": "/api/fake/patients",
-            "verifyPatient": "POST /api/fake/verify-patient",
+            "doctorCalendar": "/api/demo/doctor-calendar?specialty=GP&urgency=soon",
+            "addDoctorCalendarSlot": "POST /api/demo/doctor-calendar",
+            "bookAppointment": "POST /api/demo/appointments",
+            "medicalResults": "/api/demo/medical-results?result_type=bloods",
+            "addMedicalResult": "POST /api/demo/medical-results",
+            "addCurrentPrescription": "POST /api/demo/current-prescriptions",
+            "escalate": "POST /api/demo/escalate",
+            "prescriptionRequest": "POST /api/demo/prescription-request",
+            "state": "/api/demo/state",
+            "reset": "POST /api/demo/reset",
+            "patients": "/api/demo/patients",
+            "verifyPatient": "POST /api/demo/verify-patient",
         },
     }
 
 
-@app.get("/api/fake/state")
-async def fake_state() -> dict[str, Any]:
+@app.get("/api/demo/state")
+async def demo_state_endpoint() -> dict[str, Any]:
     return demo_state()
 
 
-@app.patch("/api/fake/config")
-async def fake_update_config(payload: dict[str, Any]) -> dict[str, Any]:
+@app.patch("/api/demo/config")
+async def demo_update_config(payload: dict[str, Any]) -> dict[str, Any]:
     return update_demo_config(payload)
 
 
-@app.post("/api/fake/reset")
-async def fake_reset() -> dict[str, Any]:
+@app.post("/api/demo/reset")
+async def demo_reset() -> dict[str, Any]:
     return reset_demo_state()
 
 
-@app.patch("/api/fake/{collection}/{record_id}")
-async def fake_update_record(collection: str, record_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+@app.patch("/api/demo/{collection}/{record_id}")
+async def demo_update_record(collection: str, record_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     result = update_record(collection, record_id, payload)
     if "error" in result:
         raise HTTPException(404, result["error"])

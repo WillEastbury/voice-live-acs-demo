@@ -5,9 +5,9 @@ This sample demonstrates two ways to run a low-latency Azure Voice Live agent:
 1. **Browser voice chat**: microphone audio streams from a web page to the backend, then to Azure Voice Live. This does not need an ACS phone number.
 2. **ACS telephony bridge**: Azure Communication Services (ACS) Call Automation answers calls, opens bidirectional media streaming, and bridges 24 kHz PCM audio to Azure Voice Live.
 
-The default agent is a voice-control assistant for a fictional smart home. The browser demo includes a live context editor so a presenter can change what the agent knows before or during a session, plus a simulated tool-result injection path for demos.
+The default agent is a demo healthcare assistant. The browser demo includes a live context editor so a presenter can change what the agent knows before or during a session, plus a simulated tool-result injection path for demos.
 
-The deployed sample also includes **demo-only fake healthcare tools** for appointment lookup, medical result lookup, human escalation, and prescription requests. They return synthetic data only and are not connected to any clinical system.
+The deployed sample also includes **demo-only healthcare tools** for appointment lookup, medical result lookup, human escalation, and prescription requests. They return synthetic data only and are not connected to any clinical system.
 
 ## How it works
 
@@ -32,31 +32,31 @@ The `/voice` page has a **Conversation prompt/context** editor:
 
 - **Before the session**: edit the context and click **Start voice session**. The UI sends the context as soon as the WebSocket opens.
 - **During the session**: edit the context and click **Apply context to live session**. The backend sends a new `session.update` to Voice Live with the latest context appended to the base system instructions.
-- **Fake tool result**: click **Inject as fake tool result**. The backend inserts a live conversation item that looks like external state from a simulated tool named `demo_state_editor`, then asks Voice Live to respond.
+- **Simulated tool result**: click **Inject as simulated tool result**. The backend inserts a live conversation item that looks like external state from a simulated tool named `demo_state_editor`, then asks Voice Live to respond.
 
 This is useful for demos where you want to reveal changing application state to the agent without building real integrations.
 
-### Fake medical tools
+### Demo medical tools
 
-Voice Live receives five callable function tools in `session.update`:
+Voice Live receives six callable function tools in `session.update`:
 
 | Tool | Purpose |
 |---|---|
-| `authenticate_patient` | Verifies a fake auth record using captured name, DOB, and postcode, then links the session to that patient. |
-| `get_doctor_calendar` | Returns fake appointment slots by specialty/date/urgency. |
-| `book_appointment` | Books a fake appointment into the in-memory fake system and marks the chosen slot booked. |
-| `get_medical_results` | Returns fake test results such as bloods, cholesterol, or X-ray. |
-| `escalate_to_person` | Creates a fake human callback/escalation ticket. |
-| `request_prescription` | Creates a fake prescription request queued for clinician review. |
+| `authenticate_patient` | Verifies a demo auth record using captured name, DOB, and postcode, then links the session to that patient. |
+| `get_doctor_calendar` | Returns appointment slots by specialty/date/urgency after authentication. |
+| `book_appointment` | Books an appointment into the in-memory demo system and marks the chosen slot booked after authentication. |
+| `get_medical_results` | Returns test results such as bloods, cholesterol, or X-ray after authentication. |
+| `escalate_to_person` | Creates a human callback/escalation ticket. This is the only tool allowed before authentication. |
+| `request_prescription` | Creates a prescription request queued for clinician review after authentication. |
 
 When Voice Live emits a function-call event, the backend:
 
 1. Parses the function name and JSON arguments.
-2. Calls the matching fake API function in `app/fake_medical_tools.py`.
+2. Calls the matching demo API function in the medical tools module.
 3. Sends a `conversation.item.create` event with `type: function_call_output`.
 4. Sends `response.create` so the agent explains the result to the user.
 
-All fake tool responses include a demo disclaimer. The app does not store patient data.
+All tool responses include a demo disclaimer. The app does not store patient data.
 
 ### ACS telephony path
 
@@ -92,23 +92,23 @@ The app is deployed to the existing AKS cluster and existing nginx ingress/LB:
 | ACS incoming webhook | `https://voice-live-acs.demos.wavefunctionlabs.com/api/incoming-call` |
 | ACS media WebSocket | `wss://voice-live-acs.demos.wavefunctionlabs.com/ws/acs-media` |
 | Browser voice chat alias | `https://voice-live-acs.demos.wavefunctionlabs.com/voice` |
-| Fake systems GUI | `https://voice-live-acs.demos.wavefunctionlabs.com/systems` |
+| Demo systems GUI | `https://voice-live-acs.demos.wavefunctionlabs.com/systems` |
 | Route/service mappings | `https://voice-live-acs.demos.wavefunctionlabs.com/api/routes` |
-| Fake API index | `https://voice-live-acs.demos.wavefunctionlabs.com/api/fake` |
+| Demo API index | `https://voice-live-acs.demos.wavefunctionlabs.com/api/demo` |
 
 The image was built by a one-shot Kubernetes build job on the existing ARM64 AKS nodes and pushed to the existing `tileforgeacr` registry. No new load balancer or persistent compute was created.
 
-The browser voice chat includes a custom greeting box, patient identity fields, and live context editor. Demo users identify with name, postcode, and date of birth against a fake auth record before their synthetic medical record is linked. Each browser voice session randomly chooses an en-GB Azure voice and personalizes the greeting with the linked synthetic patient's name. The greeting is spoken when the session starts and can be replayed during the call. Greeting and context can be saved into the in-memory demo configuration. Apply context before or during a voice session to update the Voice Live instructions, or inject the same context as a simulated tool result for demos.
+The browser voice chat includes a custom greeting box, patient identity fields, and live context editor. Demo users identify with name, postcode, and date of birth against a demo auth record before their synthetic medical record is linked. Appointment, result, prescription, and record tools are blocked until `authenticate_patient` succeeds; human escalation remains available before authentication and should be used if the caller seems frustrated or asks for a person. Each browser voice session randomly chooses an en-GB Azure voice and personalizes the greeting with the linked synthetic patient's name. The greeting is spoken when the session starts and can be replayed during the call. Greeting and context can be saved into the in-memory demo configuration. Apply context before or during a voice session to update the Voice Live instructions, or inject the same context as a simulated tool result for demos.
 
-The main `/voice` page is a merged tabbed console with **Voice chat** and **Fake systems** tabs. The standalone tabbed fake systems GUI remains available at `/systems` and lets a presenter shape the demo live:
+The main `/voice` page is a merged tabbed console with **Voice chat** and **Demo systems** tabs. The standalone tabbed demo systems GUI remains available at `/systems` and lets a presenter shape the demo live:
 
 - Add synthetic patients that can be verified and linked in the voice session.
 - Add doctor calendar slots that the `get_doctor_calendar` tool can return.
 - Show booked appointments created by the `book_appointment` tool or the control panel.
 - Add synthetic medical results that the `get_medical_results` tool can return.
-- Add current prescriptions/medicines on a patient's fake record for repeat prescription demos.
-- Create fake escalation callback tickets.
-- Create fake prescription requests.
+- Add current prescriptions/medicines on a patient's demo record for repeat prescription demos.
+- Create escalation callback tickets.
+- Create prescription requests.
 - Reset the in-memory demo state back to defaults.
 - Inspect the raw in-memory state that the Voice Live tools can see.
 - Open a patient view showing the selected synthetic patient profile plus linked results, escalations, and prescription requests.
@@ -212,26 +212,26 @@ kubectl -n voice-live-demo create secret generic voice-live-acs-demo-env \
 
 | Endpoint | Purpose |
 |---|---|
-| `/` | Merged browser voice and fake systems demo console. |
+| `/` | Merged browser voice and demo systems console. |
 | `/api/routes` | JSON metadata showing configured callback/WebSocket URLs and service mappings. |
 | `/healthz` | Health probe. |
 | `/voice` | Browser voice chat UI alias for the merged console. |
-| `/systems` | Fake healthcare systems control panel. |
+| `/systems` | Demo healthcare systems control panel. |
 | `/ws/browser-voice` | Browser voice WebSocket. |
 | `/api/incoming-call` | ACS incoming call Event Grid webhook. |
 | `/api/callbacks` | ACS Call Automation callback endpoint. |
 | `/ws/acs-media` | ACS bidirectional media WebSocket. |
 | `/api/calls/outbound/{target}` | Optional outbound PSTN call endpoint, requires `ACS_PHONE_NUMBER`. |
-| `/api/fake` | Index of fake medical APIs. |
-| `/api/fake/state` | Current in-memory fake system state. |
-| `/api/fake/reset` | Reset fake system state to defaults. |
-| `/api/fake/verify-patient` | Verify fake user identity by name, postcode, and DOB. |
-| `/api/fake/doctor-calendar` | Fake doctor calendar lookup. |
-| `/api/fake/appointments` | Fake appointment booking API. |
-| `/api/fake/medical-results` | Fake medical results lookup. |
-| `/api/fake/current-prescriptions` | Add current fake prescriptions/medicines to a patient record. |
-| `/api/fake/escalate` | Fake human escalation callback request. |
-| `/api/fake/prescription-request` | Fake prescription request. |
+| `/api/demo` | Index of demo medical APIs. |
+| `/api/demo/state` | Current in-memory demo system state. |
+| `/api/demo/reset` | Reset demo system state to defaults. |
+| `/api/demo/verify-patient` | Verify demo user identity by name, postcode, and DOB. |
+| `/api/demo/doctor-calendar` | Doctor calendar lookup. |
+| `/api/demo/appointments` | Appointment booking API. |
+| `/api/demo/medical-results` | Medical results lookup. |
+| `/api/demo/current-prescriptions` | Add current prescriptions/medicines to a patient record. |
+| `/api/demo/escalate` | Human escalation callback request. |
+| `/api/demo/prescription-request` | Prescription request. |
 
 ## Cleanup
 

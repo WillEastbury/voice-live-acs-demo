@@ -27,17 +27,17 @@
 <body>
 <main>
   <h1>Voice Live healthcare demo console</h1>
-  <p class="muted">Browser microphone to Azure Voice Live, no ACS phone number required. The fake systems panel is in the second tab.</p>
+  <p class="muted">Browser microphone to Azure Voice Live, no ACS phone number required. The demo systems panel is in the second tab.</p>
   <nav class="tabs" aria-label="Demo console tabs">
     <button class="tab active" data-tab="voice">Voice chat</button>
-    <button class="tab" data-tab="systems">Fake systems</button>
+    <button class="tab" data-tab="systems">Demo systems</button>
   </nav>
   <section class="card tab-panel active" id="tab-voice">
     <div class="row">
       <button id="start">Start voice session</button>
       <button id="stop" disabled>Stop</button>
     </div>
-    <label>Identify and link demo medical record</label>
+    <label>Presenter shortcut: identify and link a demo medical record</label>
     <div class="row">
       <input id="patientName" placeholder="Full name" value="Amelia Green">
       <input id="patientDob" placeholder="Date of birth (YYYY-MM-DD)" value="1978-09-03">
@@ -47,25 +47,27 @@
       <button id="linkPatient" disabled>Verify and link patient</button>
     </div>
     <label for="greeting">Custom greeting</label>
-    <textarea id="greeting">Hello, you're through to the demo healthcare assistant. I can help with fake appointment availability, fake test results, callback escalation, and prescription request demos. How can I help?</textarea>
+    <textarea id="greeting">Hello, you're through to the demo healthcare assistant. Before I can help with appointments, results, or prescriptions, please tell me your full name, date of birth, and postcode. If you'd rather speak to a person, I can arrange that.</textarea>
     <div class="row">
       <button id="saveGreeting">Save greeting</button>
       <button id="playGreeting" disabled>Play greeting now</button>
     </div>
     <label for="context">Conversation prompt/context</label>
     <textarea id="context">Demo clinic context:
-- Patient is using fake demo data only.
+- Patient is using synthetic demo data only.
 - Available departments: GP, cardiology, dermatology, pharmacy.
 - Do not give real medical advice.
 - For urgent or worsening symptoms, advise local urgent care/emergency services.
+- Before any appointment, result, prescription, or record lookup, authenticate the caller by collecting full name, date of birth, and postcode, then call authenticate_patient.
+- The only action allowed before authentication is escalation to a human. If the caller seems frustrated, asks for a person, objects to the flow, or wants to stop, call escalate_to_person.
 
-If asked to use tools, call the fake healthcare APIs and explain that results are synthetic demo data.</textarea>
+If asked to use tools, call the demo healthcare APIs and explain that results are synthetic demo data.</textarea>
     <div class="row">
       <button id="saveContext">Save context</button>
       <button id="applyContext" disabled>Apply context to live session</button>
-      <button id="fakeTool" disabled>Inject as fake tool result</button>
+      <button id="simulatedTool" disabled>Inject as simulated tool result</button>
     </div>
-    <p class="muted">Try: “Find me a GP appointment tomorrow”, “Do I have any fake blood results?”, “Ask a person to call me back”, or “Request a repeat prescription for demo inhaler”.</p>
+    <p class="muted">Try: “Find me a GP appointment tomorrow”, “Do I have any blood results?”, “I’m getting annoyed, can I speak to someone?”, or “Request a repeat prescription for my inhaler”.</p>
     <div class="row">
       <input id="text" placeholder="Optional typed command, e.g. turn on kitchen lights">
       <button id="send" disabled>Send text</button>
@@ -73,7 +75,7 @@ If asked to use tools, call the fake healthcare APIs and explain that results ar
     <div id="log">Idle.</div>
   </section>
   <section class="tab-panel" id="tab-systems">
-    <iframe title="Fake healthcare systems" src="/systems"></iframe>
+    <iframe title="Demo healthcare systems" src="/systems"></iframe>
   </section>
 </main>
 <script>
@@ -93,7 +95,7 @@ const linkPatientEl = document.getElementById('linkPatient');
 const contextEl = document.getElementById('context');
 const greetingEl = document.getElementById('greeting');
 const applyContextEl = document.getElementById('applyContext');
-const fakeToolEl = document.getElementById('fakeTool');
+const simulatedToolEl = document.getElementById('simulatedTool');
 const playGreetingEl = document.getElementById('playGreeting');
 
 function log(line) {
@@ -165,10 +167,9 @@ async function start() {
 
   ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/browser-voice`);
   ws.onopen = () => {
-    verifyAndLinkPatient();
     sendContextUpdate();
     sendGreeting();
-    log('Connected. Speak naturally.');
+    log('Connected. Speak naturally. The agent will authenticate before using clinical tools.');
   };
   ws.onclose = (event) => log(`Disconnected. code=${event.code || 'n/a'} reason=${event.reason || 'none'}`);
   ws.onerror = () => log('WebSocket error.');
@@ -198,7 +199,7 @@ async function start() {
   sendEl.disabled = false;
   linkPatientEl.disabled = false;
   applyContextEl.disabled = false;
-  fakeToolEl.disabled = false;
+  simulatedToolEl.disabled = false;
   playGreetingEl.disabled = false;
 }
 
@@ -213,7 +214,7 @@ function stop() {
   sendEl.disabled = true;
   linkPatientEl.disabled = true;
   applyContextEl.disabled = true;
-  fakeToolEl.disabled = true;
+  simulatedToolEl.disabled = true;
   playGreetingEl.disabled = true;
 }
 
@@ -238,7 +239,7 @@ function sendPatientIdentity(patientReference, patientName) {
 }
 
 async function verifyAndLinkPatient() {
-  const response = await fetch('/api/fake/verify-patient', {
+  const response = await fetch('/api/demo/verify-patient', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -255,10 +256,10 @@ async function verifyAndLinkPatient() {
   sendPatientIdentity(data.patient.id, data.patient.name);
 }
 
-function injectFakeToolResult() {
+function injectSimulatedToolResult() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   ws.send(JSON.stringify({
-    type: 'fake_tool_result',
+    type: 'simulated_tool_result',
     toolName: 'demo_state_editor',
     output: contextEl.value
   }));
@@ -272,7 +273,7 @@ function sendGreeting() {
 }
 
 async function saveDemoConfig(fields) {
-  const response = await fetch('/api/fake/config', {
+  const response = await fetch('/api/demo/config', {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(fields),
@@ -285,7 +286,7 @@ startEl.addEventListener('click', () => start().catch(err => log(`Start failed: 
 stopEl.addEventListener('click', stop);
 sendEl.addEventListener('click', sendText);
 applyContextEl.addEventListener('click', sendContextUpdate);
-fakeToolEl.addEventListener('click', injectFakeToolResult);
+simulatedToolEl.addEventListener('click', injectSimulatedToolResult);
 playGreetingEl.addEventListener('click', sendGreeting);
 linkPatientEl.addEventListener('click', () => verifyAndLinkPatient().catch(err => log(`Patient verification failed: ${err.message}`)));
 saveGreetingEl.addEventListener('click', () => saveDemoConfig({ greeting: greetingEl.value }).catch(err => log(`Save failed: ${err.message}`)));
@@ -298,7 +299,7 @@ textEl.addEventListener('keydown', event => {
 });
 
 async function loadDemoConfig() {
-  const response = await fetch('/api/fake/state');
+  const response = await fetch('/api/demo/state');
   const data = await response.json();
   if (data.demo_config?.greeting) greetingEl.value = data.demo_config.greeting;
   if (data.demo_config?.context) contextEl.value = data.demo_config.context;

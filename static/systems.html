@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Fake healthcare systems</title>
+  <title>Demo healthcare systems</title>
   <style>
     body { color: #f4f7fb; background: #111827; font-family: system-ui, sans-serif; margin: 0; }
     main { max-width: 1180px; margin: 0 auto; padding: 32px 20px; }
@@ -31,16 +31,16 @@
 </head>
 <body>
 <main>
-  <h1>Fake healthcare systems control panel</h1>
+  <h1>Demo healthcare systems control panel</h1>
   <p class="muted">Shape synthetic demo data while the Voice Live agent is running. Nothing here is real clinical data or persisted beyond the app process.</p>
-  <p><a href="/voice">Open voice demo</a> · <a href="/api/fake">Fake API index</a></p>
+  <p><a href="/voice">Open voice demo</a> · <a href="/api/demo">Demo API index</a></p>
   <div class="row">
     <button id="refresh">Refresh state</button>
     <button id="reset" class="secondary">Reset demo data</button>
   </div>
   <div id="status">Loading...</div>
 
-  <nav class="tabs" aria-label="Fake system tabs">
+  <nav class="tabs" aria-label="Demo system tabs">
     <button class="tab active" data-tab="calendar">Doctor calendar</button>
     <button class="tab" data-tab="appointments">Appointments</button>
     <button class="tab" data-tab="patients">Patients</button>
@@ -70,7 +70,7 @@
   <section class="card tab-panel" id="tab-medications">
       <button class="secondary panel-refresh">Refresh current prescriptions</button>
       <h2>Current prescriptions</h2>
-      <p class="muted">Medicines already on a patient's fake record and available for repeat prescription requests.</p>
+      <p class="muted">Medicines already on a patient's demo record and available for repeat prescription requests.</p>
       <div class="row">
         <select id="currentRxPatient"></select>
         <input id="currentRxMedication" placeholder="Medication" value="Demo repeat medicine">
@@ -112,7 +112,7 @@
         <input id="patientNhs" placeholder="Demo NHS/reference number" value="DEMO-0004">
         <input id="patientVerifyHint" placeholder="Voice login hint" value="Name + DOB + postcode">
       </div>
-      <textarea id="patientNotes">Demo patient created from the fake systems GUI.</textarea>
+      <textarea id="patientNotes">Demo patient created from the demo systems GUI.</textarea>
       <button id="addPatient">Add patient</button>
       <h3>Patient view</h3>
       <div class="row">
@@ -166,7 +166,7 @@
 
   <section class="card tab-panel" id="tab-raw">
     <button class="secondary panel-refresh">Refresh raw state</button>
-    <h2>Raw fake system state</h2>
+    <h2>Raw demo system state</h2>
     <p class="muted">Useful for showing exactly what the agent tools can see.</p>
     <pre id="rawState"></pre>
   </section>
@@ -185,7 +185,7 @@ async function api(path, options = {}) {
 }
 
 async function addCurrentPrescription() {
-  await api('/api/fake/current-prescriptions', {
+  await api('/api/demo/current-prescriptions', {
     method: 'POST',
     body: JSON.stringify({
       patient_reference: document.getElementById('currentRxPatient').value,
@@ -231,7 +231,7 @@ function activateTab(name) {
 }
 
 async function refresh() {
-  state = await api('/api/fake/state');
+  state = await api('/api/demo/state');
   document.getElementById('patientViewSelect').innerHTML = state.patients.map(patient =>
     `<option value="${cell(patient.id)}">${cell(patient.name)} (${cell(patient.id)})</option>`
   ).join('');
@@ -257,7 +257,7 @@ async function refresh() {
 }
 
 async function bookAppointment() {
-  await api('/api/fake/appointments', {
+  await api('/api/demo/appointments', {
     method: 'POST',
     body: JSON.stringify({
       slot_id: document.getElementById('bookingSlot').value,
@@ -270,7 +270,7 @@ async function bookAppointment() {
 
 async function loadPatientView() {
   const patientId = document.getElementById('patientViewSelect').value;
-  const view = await api(`/api/fake/patients/${encodeURIComponent(patientId)}`);
+  const view = await api(`/api/demo/patients/${encodeURIComponent(patientId)}`);
   document.getElementById('patientView').innerHTML = `
     <h4>${cell(view.patient.name)} <span class="muted">(${cell(view.patient.id)})</span></h4>
     <p><strong>DOB:</strong> ${cell(view.patient.date_of_birth)} · <strong>Postcode:</strong> ${cell(view.patient.postcode)} · <strong>Reference:</strong> ${cell(view.patient.nhs_number)}</p>
@@ -289,7 +289,7 @@ async function loadPatientView() {
 }
 
 async function addPatient() {
-  await api('/api/fake/patients', {
+  await api('/api/demo/patients', {
     method: 'POST',
     body: JSON.stringify({
       id: document.getElementById('patientId').value,
@@ -304,7 +304,7 @@ async function addPatient() {
 }
 
 async function addSlot() {
-  await api('/api/fake/doctor-calendar', {
+  await api('/api/demo/doctor-calendar', {
     method: 'POST',
     body: JSON.stringify({
       specialty: document.getElementById('slotSpecialty').value,
@@ -319,7 +319,7 @@ async function addSlot() {
 }
 
 async function addResult() {
-  await api('/api/fake/medical-results', {
+  await api('/api/demo/medical-results', {
     method: 'POST',
     body: JSON.stringify({
       patient_reference: document.getElementById('resultPatient').value,
@@ -333,7 +333,7 @@ async function addResult() {
 }
 
 async function addEscalation() {
-  await api('/api/fake/escalate', {
+  await api('/api/demo/escalate', {
     method: 'POST',
     body: JSON.stringify({
       reason: document.getElementById('escalationReason').value,
@@ -345,7 +345,7 @@ async function addEscalation() {
 }
 
 async function addPrescription() {
-  await api('/api/fake/prescription-request', {
+  await api('/api/demo/prescription-request', {
     method: 'POST',
     body: JSON.stringify({
       medication: document.getElementById('rxMedication').value,
@@ -358,7 +358,7 @@ async function addPrescription() {
 }
 
 async function reset() {
-  await api('/api/fake/reset', { method: 'POST' });
+  await api('/api/demo/reset', { method: 'POST' });
   await refresh();
 }
 

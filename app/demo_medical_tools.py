@@ -8,7 +8,7 @@ from typing import Any
 
 
 DISCLAIMER = (
-    "Demo-only fake data. This is not medical advice, not a real clinical system, "
+    "Demo-only synthetic data. This is not medical advice, not a real clinical system, "
     "and no patient data is stored."
 )
 
@@ -17,7 +17,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
         "type": "function",
         "name": "authenticate_patient",
-        "description": "Verify a fake patient auth record using the caller's captured name, date of birth, and postcode before linking medical records.",
+        "description": "Verify a demo patient auth record using the caller's captured name, date of birth, and postcode before linking medical records.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -40,7 +40,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
         "type": "function",
         "name": "get_doctor_calendar",
-        "description": "Find fake available doctor appointment slots for a demo patient.",
+        "description": "Find available doctor appointment slots for an authenticated demo patient.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -67,7 +67,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
         "type": "function",
         "name": "get_medical_results",
-        "description": "Return fake medical test results for a demo patient.",
+        "description": "Return medical test results for an authenticated demo patient.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -86,7 +86,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
         "type": "function",
         "name": "book_appointment",
-        "description": "Book a fake appointment for a linked demo patient and write it into the fake system.",
+        "description": "Book an appointment for an authenticated demo patient and write it into the demo system.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -100,7 +100,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 },
                 "reason": {
                     "type": "string",
-                    "description": "Brief fake appointment reason.",
+                    "description": "Brief appointment reason.",
                 },
             },
             "required": ["slot_id"],
@@ -109,7 +109,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
         "type": "function",
         "name": "escalate_to_person",
-        "description": "Create a fake callback/escalation ticket to a human staff member.",
+        "description": "Create a callback/escalation ticket to a human staff member. Use this if the caller asks for a person or seems frustrated.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -133,7 +133,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
         "type": "function",
         "name": "request_prescription",
-        "description": "Create a fake prescription request that requires clinician review.",
+        "description": "Create a prescription request that requires clinician review for an authenticated demo patient.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -154,8 +154,8 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
 
 DEFAULT_DEMO_STATE: dict[str, Any] = {
     "demo_config": {
-        "greeting": "Hello, you're through to the demo healthcare assistant. I can help with fake appointment availability, fake test results, callback escalation, and prescription request demos. How can I help?",
-        "context": "Demo clinic context:\n- Patient is using fake demo data only.\n- Available departments: GP, cardiology, dermatology, pharmacy.\n- Do not give real medical advice.\n- For urgent or worsening symptoms, advise local urgent care/emergency services.\n\nIf asked to use tools, call the fake healthcare APIs and explain that results are synthetic demo data.",
+        "greeting": "Hello, you're through to the demo healthcare assistant. Before I can help with appointments, results, or prescriptions, please tell me your full name, date of birth, and postcode. If you'd rather speak to a person, I can arrange that.",
+        "context": "Demo clinic context:\n- Patient is using synthetic demo data only.\n- Available departments: GP, cardiology, dermatology, pharmacy.\n- Do not give real medical advice.\n- For urgent or worsening symptoms, advise local urgent care/emergency services.\n- Before any appointment, result, prescription, or record lookup, authenticate the caller by collecting full name, date of birth, and postcode, then call authenticate_patient.\n- The only action allowed before authentication is escalation to a human. If the caller seems frustrated, asks for a person, objects to the flow, or wants to stop, call escalate_to_person.\n\nIf asked to use tools, call the demo healthcare APIs and explain that results are synthetic demo data.",
     },
     "patients": [
         {"id": "demo-patient", "name": "Alex Demo", "date_of_birth": "1984-04-12", "postcode": "SW1A 1AA", "nhs_number": "DEMO-0001", "notes": "Default demo patient."},
@@ -242,7 +242,7 @@ def authenticate_patient(name: str, date_of_birth: str, postcode: str) -> dict[s
         return {
             "disclaimer": DISCLAIMER,
             "authenticated": False,
-            "error": "No matching fake auth record found.",
+            "error": "No matching demo auth record found.",
             "next_step": "Ask the caller to repeat their name, date of birth, and postcode, or escalate to a person.",
         }
     return {
@@ -250,7 +250,7 @@ def authenticate_patient(name: str, date_of_birth: str, postcode: str) -> dict[s
         "authenticated": True,
         "patient_reference": patient["id"],
         "patient": patient,
-        "next_step": "The fake patient record is linked for this session. You may now use patient-scoped tools.",
+        "next_step": "The demo patient record is linked for this session. You may now use patient-scoped tools.",
     }
 
 
@@ -347,7 +347,7 @@ def add_current_prescription(prescription: dict[str, Any]) -> dict[str, Any]:
 
 def update_record(collection: str, record_id: str, updates: dict[str, Any]) -> dict[str, Any]:
     if collection not in DEMO_STATE:
-        return {"disclaimer": DISCLAIMER, "error": f"Unknown fake system collection: {collection}"}
+        return {"disclaimer": DISCLAIMER, "error": f"Unknown demo system collection: {collection}"}
     for record in DEMO_STATE[collection]:
         if record.get("id") == record_id:
             for key, value in updates.items():
@@ -441,7 +441,7 @@ def book_appointment(
         "disclaimer": DISCLAIMER,
         "appointment": deepcopy(record),
         "updated_slot": deepcopy(slot),
-        "next_step": "Tell the user the fake appointment has been recorded in the demo system.",
+        "next_step": "Tell the user the appointment has been recorded in the demo system.",
     }
 
 
@@ -495,7 +495,7 @@ def request_prescription(
         "pharmacy": pharmacy or (current or {}).get("pharmacy") or "not specified",
         "reason": reason or "not specified",
         "matched_current_prescription_id": (current or {}).get("id", "none"),
-        "status": "queued for fake clinician review",
+        "status": "queued for clinician review",
         "next_step": "Tell the user this is only a demo request and would require clinician approval in a real system.",
     }
     DEMO_STATE["prescription_requests"].append({k: v for k, v in record.items() if k != "disclaimer"})
@@ -511,6 +511,17 @@ def _with_patient_default(arguments: dict[str, Any], patient_reference: str | No
 def call_tool(name: str, arguments: dict[str, Any], patient_reference: str | None = None) -> dict[str, Any]:
     if name == "authenticate_patient":
         return authenticate_patient(**arguments)
+    if name != "escalate_to_person" and not patient_reference:
+        return {
+            "disclaimer": DISCLAIMER,
+            "authenticated": False,
+            "auth_required": True,
+            "error": "Patient authentication is required before using this tool.",
+            "next_step": (
+                "Collect the caller's full name, date of birth, and postcode, then call "
+                "authenticate_patient. If they seem frustrated or ask for a person, call escalate_to_person."
+            ),
+        }
     arguments = _with_patient_default(arguments, patient_reference)
     if name == "get_doctor_calendar":
         return get_doctor_calendar(**arguments)

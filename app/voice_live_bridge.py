@@ -12,7 +12,7 @@ from azure.identity.aio import DefaultAzureCredential
 from starlette.websockets import WebSocket
 
 from .config import Settings
-from .fake_medical_tools import TOOL_DEFINITIONS, call_tool, get_patient
+from .demo_medical_tools import TOOL_DEFINITIONS, call_tool, get_patient
 
 logger = logging.getLogger("voice-live-acs-demo.bridge")
 
@@ -80,12 +80,24 @@ class VoiceLiveBridge:
             )
 
     async def _configure_session(self) -> None:
+        instructions = (
+            f"{self.settings.voice_live_instructions}\n\n"
+            "Healthcare demo flow:\n"
+            "- Before appointment lookup or booking, medical result lookup, prescription requests, "
+            "or record access, collect the caller's full name, date of birth, and postcode, then call "
+            "authenticate_patient.\n"
+            "- Do not use patient-scoped tools until authenticate_patient succeeds.\n"
+            "- The only tool you may use before authentication succeeds is escalate_to_person.\n"
+            "- If the caller asks for a person, sounds frustrated, objects to the authentication flow, "
+            "or wants to stop, call escalate_to_person.\n"
+            "- For urgent or worsening symptoms, advise local urgent care or emergency services."
+        )
         await self._send_voice_live(
             {
                 "type": "session.update",
                 "session": {
                     "modalities": ["text", "audio"],
-                    "instructions": self.settings.voice_live_instructions,
+                    "instructions": instructions,
                     "input_audio_sampling_rate": 24000,
                     "input_audio_transcription": {"model": "azure-speech", "language": "en"},
                     "turn_detection": {
@@ -345,7 +357,7 @@ class BrowserVoiceBridge(VoiceLiveBridge):
                     await self._send_voice_live({"type": "response.create"})
                 continue
 
-            if message_type == "fake_tool_result":
+            if message_type == "simulated_tool_result":
                 tool_name = str(message.get("toolName") or "demo_context_lookup").strip()
                 output = str(message.get("output") or "").strip()
                 if output:
@@ -390,7 +402,18 @@ class BrowserVoiceBridge(VoiceLiveBridge):
                 await self._send_voice_live({"type": "input_audio_buffer.clear"})
 
     async def _configure_session(self) -> None:
-        instructions = self.settings.voice_live_instructions
+        instructions = (
+            f"{self.settings.voice_live_instructions}\n\n"
+            "Healthcare demo flow:\n"
+            "- Before appointment lookup or booking, medical result lookup, prescription requests, "
+            "or record access, collect the caller's full name, date of birth, and postcode, then call "
+            "authenticate_patient.\n"
+            "- Do not use patient-scoped tools until authenticate_patient succeeds.\n"
+            "- The only tool you may use before authentication succeeds is escalate_to_person.\n"
+            "- If the caller asks for a person, sounds frustrated, objects to the authentication flow, "
+            "or wants to stop, call escalate_to_person.\n"
+            "- For urgent or worsening symptoms, advise local urgent care or emergency services."
+        )
         if self.demo_context:
             instructions = (
                 f"{instructions}\n\n"
