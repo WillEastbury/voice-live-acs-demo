@@ -5,39 +5,135 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Demo healthcare systems</title>
   <style>
-    body { color: #f4f7fb; background: #111827; font-family: system-ui, sans-serif; margin: 0; }
-    main { max-width: 1180px; margin: 0 auto; padding: 32px 20px; }
-    a { color: #93c5fd; }
-    button, input, select, textarea { border-radius: 10px; border: 1px solid #334155; font: inherit; padding: 10px 12px; }
-    button { background: #2563eb; color: white; cursor: pointer; }
-    button.secondary { background: #475569; }
-    input, select, textarea { background: #0f172a; color: #f8fafc; width: 100%; box-sizing: border-box; }
-    textarea { min-height: 74px; }
-    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
-    .tab { background: #334155; border-color: #475569; }
-    .tab.active { background: #2563eb; border-color: #60a5fa; }
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --panel: rgba(15, 23, 42, 0.84);
+      --line: rgba(148, 163, 184, 0.22);
+      --text: #edf5ff;
+      --muted: #9fb2c8;
+      --accent: #38bdf8;
+      --accent-strong: #2563eb;
+      --danger: #fb7185;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+    }
+    * { box-sizing: border-box; }
+    body {
+      color: var(--text);
+      background:
+        radial-gradient(circle at 8% 8%, rgba(56, 189, 248, 0.2), transparent 28rem),
+        radial-gradient(circle at 88% 2%, rgba(99, 102, 241, 0.22), transparent 28rem),
+        linear-gradient(135deg, #07111f, #0f172a 48%, #111827);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      min-height: 100vh;
+    }
+    main { max-width: 1240px; margin: 0 auto; padding: 30px 20px 42px; }
+    a { color: #8bdcff; font-weight: 800; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1 { font-size: clamp(2rem, 4vw, 3.6rem); letter-spacing: -0.06em; line-height: 0.96; margin: 0; }
+    h2 { letter-spacing: -0.04em; margin: 6px 0 10px; }
+    h3, h4 { letter-spacing: -0.02em; }
+    button, input, select, textarea {
+      border-radius: 13px;
+      border: 1px solid var(--line);
+      font: inherit;
+      outline: none;
+      padding: 11px 13px;
+      transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease, background .18s ease;
+    }
+    button {
+      background: linear-gradient(135deg, var(--accent-strong), #06b6d4);
+      box-shadow: 0 14px 34px rgba(37, 99, 235, 0.26);
+      color: white;
+      cursor: pointer;
+      font-weight: 850;
+    }
+    button:hover { transform: translateY(-1px); }
+    button.secondary { background: rgba(71, 85, 105, 0.78); box-shadow: none; }
+    #reset { background: linear-gradient(135deg, rgba(190, 18, 60, .9), rgba(244, 63, 94, .82)); }
+    input, select, textarea { background: rgba(2, 6, 23, 0.48); color: var(--text); width: 100%; }
+    input:focus, select:focus, textarea:focus { border-color: rgba(56, 189, 248, 0.84); box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12); }
+    textarea { line-height: 1.5; min-height: 84px; resize: vertical; }
+    .shell {
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.84), rgba(15, 23, 42, 0.6));
+      backdrop-filter: blur(22px);
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      box-shadow: var(--shadow);
+      padding: 26px;
+    }
+    .topbar { align-items: end; display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr) auto; margin-bottom: 22px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+    .links { color: var(--muted); margin-top: 12px; }
+    .stats { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 18px 0; }
+    .stat { background: rgba(2, 6, 23, 0.32); border: 1px solid var(--line); border-radius: 20px; padding: 16px; }
+    .stat strong { display: block; font-size: 1.55rem; letter-spacing: -0.05em; }
+    .stat span { color: var(--muted); font-size: .84rem; font-weight: 750; }
+    .tabs {
+      background: rgba(2, 6, 23, 0.38);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 18px 0 18px;
+      padding: 6px;
+    }
+    .tab { background: transparent; border: 0; box-shadow: none; color: var(--muted); padding: 10px 14px; }
+    .tab.active { background: rgba(56, 189, 248, 0.16); color: #e0f7ff; }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
-    .card { background: #1f2937; border: 1px solid #334155; border-radius: 18px; padding: 18px; }
-    .row { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 10px 0; }
+    .card { background: rgba(15, 23, 42, 0.7); border: 1px solid var(--line); border-radius: 24px; padding: 20px; }
+    .row { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 12px 0; }
     .row3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .muted { color: #94a3b8; }
-    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
-    th, td { border-bottom: 1px solid #334155; padding: 8px; text-align: left; vertical-align: top; }
-    th { color: #cbd5e1; }
-    code { background: #020617; border-radius: 6px; padding: 2px 6px; }
-    #status { background: #020617; border-radius: 12px; margin: 16px 0; padding: 12px; white-space: pre-wrap; }
+    .muted { color: var(--muted); line-height: 1.65; }
+    table {
+      background: rgba(2, 6, 23, 0.28);
+      border: 1px solid var(--line);
+      border-collapse: separate;
+      border-radius: 18px;
+      border-spacing: 0;
+      display: block;
+      margin-top: 16px;
+      overflow: auto;
+      width: 100%;
+    }
+    th, td { border-bottom: 1px solid rgba(148, 163, 184, 0.16); padding: 11px 12px; text-align: left; vertical-align: top; white-space: nowrap; }
+    th { background: rgba(15, 23, 42, 0.92); color: #cfe4f8; font-size: .76rem; letter-spacing: .08em; position: sticky; text-transform: uppercase; top: 0; }
+    tr:last-child td { border-bottom: 0; }
+    code, pre { background: #020617; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 14px; }
+    pre { overflow: auto; padding: 16px; }
+    #status { background: rgba(2, 6, 23, 0.52); border: 1px solid var(--line); border-radius: 18px; color: #c8d9ec; margin: 16px 0; padding: 14px; white-space: pre-wrap; }
+    #patientView { background: rgba(2, 6, 23, 0.25); border: 1px solid var(--line); border-radius: 20px; margin: 14px 0; padding: 0 16px 12px; }
+    .panel-refresh { float: right; }
+    @media (max-width: 880px) {
+      .topbar, .stats, .row, .row3 { grid-template-columns: 1fr; }
+      .actions { justify-content: stretch; }
+      .actions button { width: 100%; }
+    }
   </style>
 </head>
 <body>
 <main>
-  <h1>Demo healthcare systems control panel</h1>
-  <p class="muted">Shape synthetic demo data while the Voice Live agent is running. Nothing here is real clinical data or persisted beyond the app process.</p>
-  <p><a href="/voice">Open voice demo</a> · <a href="/api/demo">Demo API index</a></p>
-  <div class="row">
-    <button id="refresh">Refresh state</button>
-    <button id="reset" class="secondary">Reset demo data</button>
-  </div>
+  <div class="shell">
+  <header class="topbar">
+    <div>
+      <h1>Demo healthcare systems</h1>
+      <p class="muted">Shape synthetic appointment, patient, result, prescription, and escalation data while the Voice Live agent is running.</p>
+      <p class="links"><a href="/voice">Open voice console</a> · <a href="/api/demo">Demo API index</a></p>
+    </div>
+    <div class="actions">
+      <button id="refresh">Refresh state</button>
+      <button id="reset" class="secondary">Reset demo data</button>
+    </div>
+  </header>
+  <section class="stats" aria-label="Demo system counts">
+    <div class="stat"><strong id="statPatients">-</strong><span>Patients</span></div>
+    <div class="stat"><strong id="statSlots">-</strong><span>Open slots</span></div>
+    <div class="stat"><strong id="statAppointments">-</strong><span>Appointments</span></div>
+    <div class="stat"><strong id="statEscalations">-</strong><span>Escalations</span></div>
+  </section>
   <div id="status">Loading...</div>
 
   <nav class="tabs" aria-label="Demo system tabs">
@@ -170,6 +266,7 @@
     <p class="muted">Useful for showing exactly what the agent tools can see.</p>
     <pre id="rawState"></pre>
   </section>
+  </div>
  </main>
 <script>
 const statusEl = document.getElementById('status');
@@ -253,6 +350,10 @@ async function refresh() {
   table('escalationsTable', ['ticket_id', 'reason', 'urgency', 'callback_number', 'created_at'], state.escalations);
   table('prescriptionsTable', ['request_id', 'medication', 'dosage', 'pharmacy', 'reason', 'status'], state.prescription_requests);
   document.getElementById('rawState').textContent = JSON.stringify(state, null, 2);
+  document.getElementById('statPatients').textContent = state.patients.length;
+  document.getElementById('statSlots').textContent = state.calendar_slots.filter(slot => slot.status === 'available').length;
+  document.getElementById('statAppointments').textContent = state.appointments.length;
+  document.getElementById('statEscalations').textContent = state.escalations.length;
   setStatus(`Loaded ${state.patients.length} patients, ${state.calendar_slots.length} slots, ${state.appointments.length} appointments, ${state.medical_results.length} results, ${state.current_prescriptions.length} current prescriptions, ${state.escalations.length} escalations, ${state.prescription_requests.length} prescription requests.`);
 }
 
