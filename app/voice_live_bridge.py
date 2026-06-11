@@ -12,7 +12,7 @@ from azure.identity.aio import DefaultAzureCredential
 from starlette.websockets import WebSocket
 
 from .config import Settings
-from .fake_medical_tools import TOOL_DEFINITIONS, call_tool_json, get_patient
+from .fake_medical_tools import TOOL_DEFINITIONS, call_tool, get_patient
 
 logger = logging.getLogger("voice-live-acs-demo.bridge")
 
@@ -180,7 +180,18 @@ class VoiceLiveBridge:
             return True
 
         self.completed_tool_calls.add(call_id)
-        output = call_tool_json(name, arguments, self.patient_reference)
+        try:
+            parsed_arguments = json.loads(arguments or "{}")
+        except json.JSONDecodeError as exc:
+            result = {
+                "error": f"Invalid tool arguments JSON: {exc}",
+            }
+        else:
+            result = call_tool(name, parsed_arguments, self.patient_reference)
+        if name == "authenticate_patient" and result.get("authenticated"):
+            self.patient_reference = result.get("patient_reference")
+            await self._configure_session()
+        output = json.dumps(result)
         logger.info("Voice Live tool call: %s(%s) -> %s", name, arguments, output)
         await self._send_voice_live(
             {

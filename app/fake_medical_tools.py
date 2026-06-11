@@ -16,6 +16,29 @@ DISCLAIMER = (
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
         "type": "function",
+        "name": "authenticate_patient",
+        "description": "Verify a fake patient auth record using the caller's captured name, date of birth, and postcode before linking medical records.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Full name captured from the caller.",
+                },
+                "date_of_birth": {
+                    "type": "string",
+                    "description": "Date of birth in YYYY-MM-DD format.",
+                },
+                "postcode": {
+                    "type": "string",
+                    "description": "UK postcode captured from the caller.",
+                },
+            },
+            "required": ["name", "date_of_birth", "postcode"],
+        },
+    },
+    {
+        "type": "function",
         "name": "get_doctor_calendar",
         "description": "Find fake available doctor appointment slots for a demo patient.",
         "parameters": {
@@ -211,6 +234,24 @@ def verify_patient_identity(name: str, date_of_birth: str, postcode: str) -> dic
         ):
             return deepcopy(patient)
     return None
+
+
+def authenticate_patient(name: str, date_of_birth: str, postcode: str) -> dict[str, Any]:
+    patient = verify_patient_identity(name, date_of_birth, postcode)
+    if not patient:
+        return {
+            "disclaimer": DISCLAIMER,
+            "authenticated": False,
+            "error": "No matching fake auth record found.",
+            "next_step": "Ask the caller to repeat their name, date of birth, and postcode, or escalate to a person.",
+        }
+    return {
+        "disclaimer": DISCLAIMER,
+        "authenticated": True,
+        "patient_reference": patient["id"],
+        "patient": patient,
+        "next_step": "The fake patient record is linked for this session. You may now use patient-scoped tools.",
+    }
 
 
 def add_patient(patient: dict[str, Any]) -> dict[str, Any]:
@@ -468,6 +509,8 @@ def _with_patient_default(arguments: dict[str, Any], patient_reference: str | No
 
 
 def call_tool(name: str, arguments: dict[str, Any], patient_reference: str | None = None) -> dict[str, Any]:
+    if name == "authenticate_patient":
+        return authenticate_patient(**arguments)
     arguments = _with_patient_default(arguments, patient_reference)
     if name == "get_doctor_calendar":
         return get_doctor_calendar(**arguments)

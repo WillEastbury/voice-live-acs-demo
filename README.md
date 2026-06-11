@@ -42,6 +42,7 @@ Voice Live receives five callable function tools in `session.update`:
 
 | Tool | Purpose |
 |---|---|
+| `authenticate_patient` | Verifies a fake auth record using captured name, DOB, and postcode, then links the session to that patient. |
 | `get_doctor_calendar` | Returns fake appointment slots by specialty/date/urgency. |
 | `book_appointment` | Books a fake appointment into the in-memory fake system and marks the chosen slot booked. |
 | `get_medical_results` | Returns fake test results such as bloods, cholesterol, or X-ray. |

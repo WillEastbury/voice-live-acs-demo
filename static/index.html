@@ -179,6 +179,7 @@ async function start() {
     if (message.type === 'event') log(`Event: ${message.event}`);
     if (message.type === 'event' && message.event === 'voice.selected') log(`British voice selected: ${message.voice}`);
     if (message.type === 'tool_call') log(`Tool called: ${message.name}`);
+    if (message.type === 'tool_call' && message.name === 'authenticate_patient') log('Authentication request tool fired.');
     if (message.type === 'error') log(`Error: ${JSON.stringify(message.error)}`);
   };
 
